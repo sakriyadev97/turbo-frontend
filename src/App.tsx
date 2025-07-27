@@ -62,8 +62,8 @@ function App() {
   // State for order quantities
   const [orderQuantities, setOrderQuantities] = useState<{[key: string]: number}>({});
 
-  // API Base URL
-  const API_BASE_URL = 'http://localhost:5000/api';
+  // API Base URL - Use deployed backend or fallback to localhost
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://turbo-backend-kslh.vercel.app/api';
 
   // API Functions
   const fetchAllTurbos = async () => {
