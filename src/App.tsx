@@ -392,6 +392,9 @@ function App() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    console.log('handleInputChange called for:', e.target.name, 'value:', e.target.value);
+    console.log('Modal state when handleInputChange called:', showModal);
+    
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
     setNewTurboForm(prev => ({
@@ -697,13 +700,22 @@ function App() {
             type="text"
             placeholder="Search turbos by ID, model, or bay..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              console.log('Search onChange triggered:', e.target.value);
+              setSearchTerm(e.target.value);
+            }}
             onKeyDown={(e) => {
               console.log('Search key pressed:', e.key);
               if (e.key === 'Enter') {
                 e.preventDefault();
                 console.log('Enter pressed in search - preventing default');
               }
+            }}
+            onFocus={(e) => {
+              console.log('Search input focused');
+            }}
+            onBlur={(e) => {
+              console.log('Search input blurred');
             }}
             className="search-input"
           />
