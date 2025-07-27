@@ -63,7 +63,10 @@ function App() {
   const [orderQuantities, setOrderQuantities] = useState<{[key: string]: number}>({});
 
   // API Base URL - Use deployed backend or fallback to localhost
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://turbo-backend-henna.vercel.app/api';
+  const API_BASE_URL =  'https://turbo-backend-henna.vercel.app/api';
+  
+  // Debug log to check which URL is being used
+  console.log('API_BASE_URL:', API_BASE_URL);
 
   // API Functions
   const fetchAllTurbos = async () => {
@@ -342,7 +345,7 @@ function App() {
     setIsLoading(true);
     
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch('https://turbo-backend-henna.vercel.app/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
