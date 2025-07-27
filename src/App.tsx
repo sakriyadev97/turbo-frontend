@@ -401,6 +401,16 @@ function App() {
   };
 
   const handleSaveTurbo = () => {
+    console.log('handleSaveTurbo called - this should not happen from search!');
+    console.log('Current search term:', searchTerm);
+    console.log('Modal state:', showModal);
+    
+    // Prevent execution if modal is not open
+    if (!showModal) {
+      console.log('Modal not open, preventing save');
+      return;
+    }
+    
     // Check if model field is filled
     if (!newTurboForm.model.trim()) {
       toast.error('Please enter model name(s)');
@@ -688,6 +698,13 @@ function App() {
             placeholder="Search turbos by ID, model, or bay..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={(e) => {
+              console.log('Search key pressed:', e.key);
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                console.log('Enter pressed in search - preventing default');
+              }
+            }}
             className="search-input"
           />
           <span className="search-icon">🔍</span>
