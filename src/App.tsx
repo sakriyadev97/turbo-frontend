@@ -81,6 +81,8 @@ function App() {
         
         // Transform backend data to frontend format
         const transformedTurbos = turbosArray.map((turbo: any) => {
+          console.log('Processing turbo:', turbo); // Debug each turbo item
+          
           // Handle different data structures
           if (turbo.hasSizeOption && turbo.sizeVariants) {
             // Big/Small variants - create separate items for each
@@ -88,41 +90,50 @@ function App() {
             
             if (turbo.sizeVariants.big && turbo.sizeVariants.big.partNumbers) {
               turbo.sizeVariants.big.partNumbers.forEach((partNumber: string) => {
-                items.push({
-                  id: partNumber,
-                  model: partNumber,
-                  location: turbo.location,
-                  bay: turbo.location, // For backward compatibility
-                  quantity: turbo.sizeVariants.big.quantity || 0,
-                  isLowStock: (turbo.sizeVariants.big.quantity || 0) <= 1
-                });
+                if (partNumber && partNumber.trim()) { // Only add if partNumber exists
+                  items.push({
+                    id: partNumber,
+                    model: partNumber,
+                    location: turbo.location || 'No location',
+                    bay: turbo.location || 'No location', // For backward compatibility
+                    quantity: turbo.sizeVariants.big.quantity || 0,
+                    isLowStock: (turbo.sizeVariants.big.quantity || 0) <= 1
+                  });
+                }
               });
             }
             
             if (turbo.sizeVariants.small && turbo.sizeVariants.small.partNumbers) {
               turbo.sizeVariants.small.partNumbers.forEach((partNumber: string) => {
-                items.push({
-                  id: partNumber,
-                  model: partNumber,
-                  location: turbo.location,
-                  bay: turbo.location, // For backward compatibility
-                  quantity: turbo.sizeVariants.small.quantity || 0,
-                  isLowStock: (turbo.sizeVariants.small.quantity || 0) <= 1
-                });
+                if (partNumber && partNumber.trim()) { // Only add if partNumber exists
+                  items.push({
+                    id: partNumber,
+                    model: partNumber,
+                    location: turbo.location || 'No location',
+                    bay: turbo.location || 'No location', // For backward compatibility
+                    quantity: turbo.sizeVariants.small.quantity || 0,
+                    isLowStock: (turbo.sizeVariants.small.quantity || 0) <= 1
+                  });
+                }
               });
             }
             
             return items;
           } else {
             // Regular turbo items
-            return (turbo.partNumbers || []).map((partNumber: string) => ({
-              id: partNumber,
-              model: partNumber,
-              location: turbo.location,
-              bay: turbo.location, // For backward compatibility
-              quantity: turbo.quantity || 0,
-              isLowStock: (turbo.quantity || 0) <= 1
-            }));
+            return (turbo.partNumbers || []).map((partNumber: string) => {
+              if (partNumber && partNumber.trim()) { // Only add if partNumber exists
+                return {
+                  id: partNumber,
+                  model: partNumber,
+                  location: turbo.location || 'No locationssss',
+                  bay: turbo.location || 'No location', // For backward compatibility
+                  quantity: turbo.quantity || 0,
+                  isLowStock: (turbo.quantity || 0) <= 1
+                };
+              }
+              return null; // Skip invalid items
+            }).filter(Boolean); // Remove null items
           }
         }).flat(); // Flatten the array of arrays
         
@@ -166,7 +177,7 @@ function App() {
 
       if (response.ok) {
         const newTurbo = await response.json();
-        setTurboItems(prev => Array.isArray(prev) ? [...prev, newTurbo] : [newTurbo]);
+        console.log('Backend response for new turbo:', newTurbo); // Debug log
         toast.success('Turbo added successfully!');
         setShowModal(false);
         setNewTurboForm({
@@ -180,6 +191,7 @@ function App() {
           smallModels: '',
           smallQuantity: '0'
         });
+        fetchAllTurbos(); // Refresh all data instead of adding raw response
         fetchTurboStats(); // Refresh stats
       } else {
         const error = await response.json();
