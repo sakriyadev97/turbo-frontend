@@ -155,6 +155,11 @@ body {
   color: white;
 }
 
+.btn-blue {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+}
+
 .btn-icon {
   font-size: 16px;
 }
@@ -324,6 +329,15 @@ body {
 
 .delete-btn:hover {
   background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+}
+
+.order-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+}
+
+.order-btn:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
 }
 
 .action-icon {
@@ -1163,6 +1177,24 @@ body {
   max-height: 80vh;
 }
 
+.pending-modal {
+  max-width: 700px;
+  max-height: 80vh;
+}
+
+.pending-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
 .low-stock-icon {
   font-size: 2rem;
   color: #f59e0b;
@@ -1249,6 +1281,94 @@ body {
   background: #f9fafb;
   border-radius: 12px;
   border: 1px dashed #d1d5db;
+}
+
+.pending-orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.pending-order-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  border: 2px solid #e5e7eb;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.pending-order-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.pending-order-card.arrived {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.pending-order-card .order-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pending-order-card .order-id {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.pending-order-card .order-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.pending-order-card .order-info span {
+  background: #f3f4f6;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.pending-order-card .order-status {
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  align-self: flex-start;
+}
+
+.pending-order-card .order-status.pending {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+}
+
+.pending-order-card .order-status.arrived {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+}
+
+.pending-order-card .order-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.no-pending-message {
+  text-align: center;
+  color: #6b7280;
+  font-size: 1.1rem;
+  padding: 40px 20px;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 2px dashed #d1d5db;
 }
 
 .sell-icon {

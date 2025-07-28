@@ -31,6 +31,16 @@ interface LoginForm {
   password: string;
 }
 
+interface PendingOrder {
+  id: string;
+  partNumber: string;
+  model: string;
+  location: string;
+  quantity: number;
+  orderDate: string;
+  status: 'pending' | 'arrived';
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,9 +50,11 @@ function App() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSellModal, setShowSellModal] = useState(false);
   const [showLowStockModal, setShowLowStockModal] = useState(false);
+  const [showPendingModal, setShowPendingModal] = useState(false);
   const [editingTurbo, setEditingTurbo] = useState<TurboItem | null>(null);
   const [sellingTurbo, setSellingTurbo] = useState<TurboItem | null>(null);
   const [sellQuantity, setSellQuantity] = useState(1);
+  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
   const [turboItems, setTurboItems] = useState<TurboItem[]>([]);
   const [turboStats, setTurboStats] = useState({
     totalItems: 0,
@@ -234,6 +246,13 @@ function App() {
 
       // We need to find the actual MongoDB document that contains this part number
       // For now, let's try to update by part number in the backend
+      console.log('Sending update request with data:', {
+        partNumber: id,
+        ...updateData
+      });
+      console.log('Priority field type:', typeof updateData.priority);
+      console.log('Priority field value:', updateData.priority);
+      
       const response = await fetch(`${API_BASE_URL}/turbos/update-by-partnumber`, {
         method: 'PUT',
         headers: {
@@ -478,8 +497,26 @@ function App() {
   };
 
   const handleGenerateOrder = () => {
-    // Here you would typically generate and download the order document
-    console.log('Generating order with quantities:', orderQuantities);
+    // Add orders to pending list
+    const newOrders: PendingOrder[] = Object.entries(orderQuantities)
+      .filter(([_, quantity]) => quantity > 0)
+      .map(([partNumber, quantity]) => {
+        const turbo = turboItems.find(item => item.id === partNumber);
+        return {
+          id: `${partNumber}-${Date.now()}`,
+          partNumber,
+          model: turbo?.model || partNumber,
+          location: turbo?.location || turbo?.bay || 'Unknown',
+          quantity,
+          orderDate: new Date().toISOString(),
+          status: 'pending' as const
+        };
+      });
+
+    setPendingOrders(prev => [...prev, ...newOrders]);
+    
+    toast.success(`Generated ${newOrders.length} order(s) and added to pending list!`);
+    console.log('Generated orders:', newOrders);
     setShowOrderModal(false);
     setOrderQuantities({});
   };
@@ -556,6 +593,8 @@ function App() {
     }
 
     console.log('Updating turbo data:', updateData); // Debug log
+    console.log('Editing turbo priority:', editingTurbo.priority);
+    console.log('New form priority:', newTurboForm.priority);
     await updateTurbo(editingTurbo.id, updateData);
     setShowEditModal(false);
     setEditingTurbo(null);
@@ -605,6 +644,60 @@ function App() {
 
   const handleLowStockClose = () => {
     setShowLowStockModal(false);
+  };
+
+  const handlePendingClick = () => {
+    setShowPendingModal(true);
+  };
+
+  const handlePendingClose = () => {
+    setShowPendingModal(false);
+  };
+
+  const handleOrderArrived = async (order: PendingOrder) => {
+    try {
+      // Update the turbo quantity in the backend
+      const response = await fetch(`${API_BASE_URL}/turbos/update-by-partnumber`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          partNumber: order.partNumber,
+          quantity: order.quantity,
+          operation: 'add' // Add the ordered quantity to existing stock
+        })
+      });
+
+      if (response.ok) {
+        // Mark order as arrived
+        setPendingOrders(prev => 
+          prev.map(o => 
+            o.id === order.id 
+              ? { ...o, status: 'arrived' as const }
+              : o
+          )
+        );
+        
+        // Refresh turbo data
+        fetchAllTurbos();
+        fetchTurboStats();
+        
+        toast.success(`Order for ${order.model} marked as arrived!`);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to update turbo quantity');
+      }
+    } catch (error) {
+      console.error('Error marking order as arrived:', error);
+      toast.error('Network error while updating order status');
+    }
+  };
+
+  const handleIndividualOrder = (turbo: TurboItem) => {
+    // Set up order quantities for this specific turbo
+    setOrderQuantities({ [turbo.id]: 1 });
+    setShowOrderModal(true);
   };
 
   const handleSellConfirm = async () => {
@@ -806,6 +899,10 @@ function App() {
             <span className="btn-icon">📦</span>
             Order Now
           </button>
+          <button className="btn btn-blue" onClick={handlePendingClick}>
+            <span className="btn-icon">⏳</span>
+            Pending ({pendingOrders.filter(o => o.status === 'pending').length})
+          </button>
         </div>
       </div>
 
@@ -855,6 +952,13 @@ function App() {
               >
                 <span className="action-icon">✏️</span>
                 Edit
+              </button>
+              <button 
+                className="action-btn order-btn"
+                onClick={() => handleIndividualOrder(item)}
+              >
+                <span className="action-icon">📋</span>
+                Order
               </button>
               <button 
                 className="action-btn delete-btn"
@@ -1434,6 +1538,61 @@ function App() {
             
             <div className="modal-actions">
               <button className="modal-btn cancel-btn" onClick={handleLowStockClose}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Orders Modal Overlay */}
+      {showPendingModal && (
+        <div className="modal-overlay" onClick={handlePendingClose}>
+          <div className="modal pending-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="pending-icon">⏳</div>
+              <h2 className="modal-title">Pending Orders</h2>
+            </div>
+            
+            <div className="modal-form">
+              <div className="pending-orders-list">
+                {pendingOrders.length === 0 ? (
+                  <div className="no-pending-message">
+                    No pending orders found. Generate orders from the "Order Now" section.
+                  </div>
+                ) : (
+                  pendingOrders.map((order) => (
+                    <div key={order.id} className={`pending-order-card ${order.status}`}>
+                      <div className="order-details">
+                        <div className="order-id">{order.partNumber}</div>
+                        <div className="order-info">
+                          <span>Model: {order.model}</span>
+                          <span>Location: {order.location}</span>
+                          <span>Quantity: {order.quantity}</span>
+                          <span>Order Date: {new Date(order.orderDate).toLocaleDateString()}</span>
+                        </div>
+                        <div className={`order-status ${order.status}`}>
+                          {order.status === 'pending' ? '⏳ Pending' : '✅ Arrived'}
+                        </div>
+                      </div>
+                      {order.status === 'pending' && (
+                        <div className="order-actions">
+                          <button 
+                            className="modal-btn save-btn"
+                            onClick={() => handleOrderArrived(order)}
+                          >
+                            Mark as Arrived
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            
+            <div className="modal-actions">
+              <button className="modal-btn cancel-btn" onClick={handlePendingClose}>
                 Close
               </button>
             </div>
