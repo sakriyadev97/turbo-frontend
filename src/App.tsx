@@ -39,6 +39,7 @@ function App() {
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSellModal, setShowSellModal] = useState(false);
+  const [showLowStockModal, setShowLowStockModal] = useState(false);
   const [editingTurbo, setEditingTurbo] = useState<TurboItem | null>(null);
   const [sellingTurbo, setSellingTurbo] = useState<TurboItem | null>(null);
   const [sellQuantity, setSellQuantity] = useState(1);
@@ -279,45 +280,7 @@ function App() {
     }
   };
 
-  const sellTurbo = async (id: string) => {
-    if (!id) {
-      toast.error('Invalid item ID');
-      return;
-    }
-    
-    const item = Array.isArray(turboItems) ? turboItems.find(item => item.id === id) : undefined;
-    if (!item || item.quantity <= 0) {
-      toast.error('Cannot sell: Item out of stock');
-      return;
-    }
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/turbos/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          quantity: item.quantity - 1
-        })
-      });
-
-      if (response.ok) {
-        const updatedTurbo = await response.json();
-        setTurboItems(prev => Array.isArray(prev) ? prev.map(item => 
-          item.id === id ? updatedTurbo : item
-        ) : []);
-        toast.success('Turbo sold successfully!');
-        fetchTurboStats(); // Refresh stats
-      } else {
-        const error = await response.json();
-        toast.error(error.message || 'Failed to sell turbo');
-      }
-    } catch (error) {
-      console.error('Error selling turbo:', error);
-      toast.error('Network error while selling turbo');
-    }
-  };
 
   // Load data on component mount
   React.useEffect(() => {
@@ -628,6 +591,14 @@ function App() {
     setSellQuantity(1);
   };
 
+  const handleLowStockClick = () => {
+    setShowLowStockModal(true);
+  };
+
+  const handleLowStockClose = () => {
+    setShowLowStockModal(false);
+  };
+
   const handleSellConfirm = async () => {
     if (!sellingTurbo) return;
 
@@ -646,19 +617,21 @@ function App() {
     // Ask for confirmation
     if (window.confirm(`Do you really want to sell ${sellQuantity} turbo(s) of ${sellingTurbo.model}?`)) {
       try {
-        // Call the existing sellTurbo function with the quantity
-        const response = await fetch(`${API_BASE_URL}/turbos/${sellingTurbo.id}`, {
-          method: 'PUT',
+        // Call the new sell API endpoint
+        const response = await fetch(`${API_BASE_URL}/turbos/sell`, {
+          method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            quantity: sellingTurbo.quantity - sellQuantity
+            partNumber: sellingTurbo.id,
+            quantity: sellQuantity
           })
         });
 
         if (response.ok) {
-          toast.success(`Successfully sold ${sellQuantity} turbo(s)!`);
+          const result = await response.json();
+          toast.success(result.message || `Successfully sold ${sellQuantity} turbo(s)!`);
           setShowSellModal(false);
           setSellingTurbo(null);
           setSellQuantity(1);
@@ -666,7 +639,11 @@ function App() {
           fetchTurboStats(); // Refresh stats
         } else {
           const error = await response.json();
-          toast.error(error.message || 'Failed to sell turbo');
+          if (error.error === 'Not enough quantity to sell') {
+            toast.error(`Not enough quantity to sell. Available: ${error.available}, Requested: ${error.requested}`);
+          } else {
+            toast.error(error.error || error.message || 'Failed to sell turbo');
+          }
         }
       } catch (error) {
         console.error('Error selling turbo:', error);
@@ -822,7 +799,7 @@ function App() {
           <div className="card-number">{totalItems}</div>
           <div className="card-label">Total Items</div>
         </div>
-        <div className="summary-card clickable">
+        <div className="summary-card clickable" onClick={handleLowStockClick}>
           <div className="card-number">{lowStockItemsCount}</div>
           <div className="card-label">Low Stock Items (Click to view)</div>
         </div>
@@ -1395,6 +1372,48 @@ function App() {
                 disabled={sellQuantity > sellingTurbo.quantity || sellQuantity <= 0}
               >
                 Sell Turbo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Low Stock Modal Overlay */}
+      {showLowStockModal && (
+        <div className="modal-overlay" onClick={handleLowStockClose}>
+          <div className="modal low-stock-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="low-stock-icon">⚠️</div>
+              <h2 className="modal-title">Low Stock Items (≤1 Quantity)</h2>
+            </div>
+            
+            <div className="modal-form">
+              <div className="low-stock-items-list">
+                {lowStockItems.map((item) => (
+                  <div key={item.id} className="low-stock-item-card">
+                    <div className="item-details">
+                      <div className="item-id">{item.id}</div>
+                      <div className="item-info">
+                        <span>ID: {item.id}</span>
+                        <span>Bay: {item.bay || item.location}</span>
+                      </div>
+                      <div className={`stock-status ${item.quantity === 0 ? 'out-of-stock' : 'low-stock'}`}>
+                        {item.quantity === 0 ? 'OUT OF STOCK' : `${item.quantity} left`}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {lowStockItems.length === 0 && (
+                  <div className="no-low-stock-message">
+                    No low stock items found. All items have sufficient quantity.
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="modal-actions">
+              <button className="modal-btn cancel-btn" onClick={handleLowStockClose}>
+                Close
               </button>
             </div>
           </div>

@@ -1136,6 +1136,100 @@ body {
   max-height: 80vh;
 }
 
+/* Low Stock Modal Specific Styles */
+.low-stock-modal {
+  max-width: 600px;
+  max-height: 80vh;
+}
+
+.low-stock-icon {
+  font-size: 2rem;
+  color: #f59e0b;
+  background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+  flex-shrink: 0;
+}
+
+.low-stock-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.low-stock-item-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.low-stock-item-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.low-stock-item-card .item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.low-stock-item-card .item-id {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.low-stock-item-card .item-info {
+  display: flex;
+  gap: 16px;
+  font-size: 0.9rem;
+  color: #6b7280;
+  flex-wrap: wrap;
+}
+
+.low-stock-item-card .item-info span {
+  white-space: nowrap;
+}
+
+.low-stock-item-card .stock-status {
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  align-self: flex-start;
+}
+
+.low-stock-item-card .stock-status.out-of-stock {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.low-stock-item-card .stock-status.low-stock {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.no-low-stock-message {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b7280;
+  font-size: 1rem;
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1px dashed #d1d5db;
+}
+
 .sell-icon {
   font-size: 2rem;
   color: #10b981;
@@ -1446,6 +1540,12 @@ body {
     padding: 24px;
   }
   
+  .low-stock-modal {
+    max-width: calc(100vw - 32px);
+    max-height: 75vh;
+    padding: 24px;
+  }
+  
   .modal-header {
     flex-direction: column;
     gap: 12px;
@@ -1515,6 +1615,11 @@ body {
   }
   
   .sell-modal {
+    padding: 20px;
+    max-height: 70vh;
+  }
+  
+  .low-stock-modal {
     padding: 20px;
     max-height: 70vh;
   }
