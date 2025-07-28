@@ -184,6 +184,27 @@ body {
 
 .summary-card.clickable {
   cursor: pointer;
+  position: relative;
+  border: 2px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.summary-card.clickable:hover {
+  border-color: #3b82f6;
+}
+
+.summary-card.clickable::after {
+  content: '👆';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 1rem;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.summary-card.clickable:hover::after {
+  opacity: 1;
 }
 
 .card-number {

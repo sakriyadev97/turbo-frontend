@@ -293,13 +293,14 @@ function App() {
   // Populate form when editing
   React.useEffect(() => {
     if (editingTurbo) {
+      console.log('Populating form with editingTurbo:', editingTurbo);
       setNewTurboForm({
         model: editingTurbo.model || '',
         bay: editingTurbo.location || editingTurbo.bay || '',
         quantity: editingTurbo.quantity?.toString() || '',
         multipleModels: false,
         bigSmallVariants: false,
-        priority: false,
+        priority: editingTurbo.priority || false,
         bigModels: '',
         bigQuantity: '0',
         smallModels: '',
@@ -591,8 +592,15 @@ function App() {
     setSellQuantity(1);
   };
 
-  const handleLowStockClick = () => {
+  const handleLowStockClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('Low stock card clicked!');
+    console.log('Event target:', e.target);
+    console.log('Current target:', e.currentTarget);
+    console.log('Current showLowStockModal:', showLowStockModal);
     setShowLowStockModal(true);
+    console.log('Setting showLowStockModal to true');
   };
 
   const handleLowStockClose = () => {
@@ -617,6 +625,9 @@ function App() {
     // Ask for confirmation
     if (window.confirm(`Do you really want to sell ${sellQuantity} turbo(s) of ${sellingTurbo.model}?`)) {
       try {
+        console.log('Selling turbo:', sellingTurbo.id, 'Quantity:', sellQuantity);
+        console.log('API URL:', `${API_BASE_URL}/turbos/sell`);
+        
         // Call the new sell API endpoint
         const response = await fetch(`${API_BASE_URL}/turbos/sell`, {
           method: 'POST',
@@ -629,8 +640,12 @@ function App() {
           })
         });
 
+        console.log('Response status:', response.status);
+        console.log('Response URL:', response.url);
+        
         if (response.ok) {
           const result = await response.json();
+          console.log('Success result:', result);
           toast.success(result.message || `Successfully sold ${sellQuantity} turbo(s)!`);
           setShowSellModal(false);
           setSellingTurbo(null);
@@ -639,6 +654,7 @@ function App() {
           fetchTurboStats(); // Refresh stats
         } else {
           const error = await response.json();
+          console.log('Error response:', error);
           if (error.error === 'Not enough quantity to sell') {
             toast.error(`Not enough quantity to sell. Available: ${error.available}, Requested: ${error.requested}`);
           } else {
@@ -799,7 +815,12 @@ function App() {
           <div className="card-number">{totalItems}</div>
           <div className="card-label">Total Items</div>
         </div>
-        <div className="summary-card clickable" onClick={handleLowStockClick}>
+        <div 
+          className="summary-card clickable" 
+          onClick={handleLowStockClick}
+          onMouseDown={(e) => e.preventDefault()}
+          style={{ userSelect: 'none' }}
+        >
           <div className="card-number">{lowStockItemsCount}</div>
           <div className="card-label">Low Stock Items (Click to view)</div>
         </div>
