@@ -10,6 +10,7 @@ interface TurboItem {
   location?: string; // Backend might return this
   quantity: number;
   isLowStock: boolean;
+  priority?: boolean; // Priority flag
 }
 
 interface NewTurboForm {
@@ -18,6 +19,7 @@ interface NewTurboForm {
   quantity: string;
   multipleModels: boolean;
   bigSmallVariants: boolean;
+  priority: boolean;
   bigModels: string;
   bigQuantity: string;
   smallModels: string;
@@ -36,7 +38,10 @@ function App() {
   const [showModal, setShowModal] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showSellModal, setShowSellModal] = useState(false);
   const [editingTurbo, setEditingTurbo] = useState<TurboItem | null>(null);
+  const [sellingTurbo, setSellingTurbo] = useState<TurboItem | null>(null);
+  const [sellQuantity, setSellQuantity] = useState(1);
   const [turboItems, setTurboItems] = useState<TurboItem[]>([]);
   const [turboStats, setTurboStats] = useState({
     totalItems: 0,
@@ -53,6 +58,7 @@ function App() {
     quantity: '',
     multipleModels: false,
     bigSmallVariants: false,
+    priority: false,
     bigModels: '',
     bigQuantity: '0',
     smallModels: '',
@@ -64,9 +70,18 @@ function App() {
 
   // API Base URL - Use deployed backend or fallback to localhost
   const API_BASE_URL =  'https://turbo-backend-henna.vercel.app/api';
+  // const API_BASE_URL =  'http://localhost:5000/api';
   
   // Debug log to check which URL is being used
   console.log('API_BASE_URL:', API_BASE_URL);
+
+  // Helper function to determine if an item is low stock
+  const isLowStockItem = (quantity: number, priority: boolean = false): boolean => {
+    if (priority) {
+      return quantity <= 5; // Priority items: low stock if 5 or less
+    }
+    return quantity <= 1; // Regular items: low stock if 1 or less
+  };
 
   // API Functions
   const fetchAllTurbos = async () => {
@@ -97,7 +112,8 @@ function App() {
                     location: turbo.location || 'No location',
                     bay: turbo.location || 'No location', // For backward compatibility
                     quantity: turbo.sizeVariants.big.quantity || 0,
-                    isLowStock: (turbo.sizeVariants.big.quantity || 0) <= 1
+                    isLowStock: isLowStockItem(turbo.sizeVariants.big.quantity || 0, turbo.priority || false),
+                    priority: turbo.priority || false
                   });
                 }
               });
@@ -112,7 +128,8 @@ function App() {
                     location: turbo.location || 'No location',
                     bay: turbo.location || 'No location', // For backward compatibility
                     quantity: turbo.sizeVariants.small.quantity || 0,
-                    isLowStock: (turbo.sizeVariants.small.quantity || 0) <= 1
+                    isLowStock: isLowStockItem(turbo.sizeVariants.small.quantity || 0, turbo.priority || false),
+                    priority: turbo.priority || false
                   });
                 }
               });
@@ -129,7 +146,8 @@ function App() {
                   location: turbo.location || 'No locationssss',
                   bay: turbo.location || 'No location', // For backward compatibility
                   quantity: turbo.quantity || 0,
-                  isLowStock: (turbo.quantity || 0) <= 1
+                  isLowStock: isLowStockItem(turbo.quantity || 0, turbo.priority || false),
+                  priority: turbo.priority || false
                 };
               }
               return null; // Skip invalid items
@@ -186,6 +204,7 @@ function App() {
           quantity: '',
           multipleModels: false,
           bigSmallVariants: false,
+          priority: false,
           bigModels: '',
           bigQuantity: '0',
           smallModels: '',
@@ -317,6 +336,7 @@ function App() {
         quantity: editingTurbo.quantity?.toString() || '',
         multipleModels: false,
         bigSmallVariants: false,
+        priority: false,
         bigModels: '',
         bigQuantity: '0',
         smallModels: '',
@@ -326,7 +346,7 @@ function App() {
   }, [editingTurbo]);
 
   // Get low stock items for order modal
-  const lowStockItems = Array.isArray(turboItems) ? turboItems.filter(item => item.isLowStock || item.quantity <= 2) : [];
+  const lowStockItems = Array.isArray(turboItems) ? turboItems.filter(item => item.isLowStock) : [];
 
   const filteredItems = Array.isArray(turboItems) ? turboItems.filter(item =>
     (item.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -441,6 +461,7 @@ function App() {
       location: newTurboForm.bay, // Changed from 'bay' to 'location' to match backend
       quantity: parseInt(newTurboForm.quantity),
       hasSizeOption: newTurboForm.bigSmallVariants, // Backend expects this field name
+      priority: newTurboForm.priority, // Add priority flag
     };
 
     // Handle big/small variants
@@ -479,6 +500,7 @@ function App() {
       quantity: '',
       multipleModels: false,
       bigSmallVariants: false,
+      priority: false,
       bigModels: '',
       bigQuantity: '0',
       smallModels: '',
@@ -542,6 +564,7 @@ function App() {
       location: newTurboForm.bay,
       quantity: parseInt(newTurboForm.quantity),
       hasSizeOption: newTurboForm.bigSmallVariants,
+      priority: newTurboForm.priority, // Add priority flag
     };
 
     // Handle big/small variants
@@ -593,6 +616,65 @@ function App() {
     }
   };
 
+  const handleSellClick = (turbo: TurboItem) => {
+    setSellingTurbo(turbo);
+    setSellQuantity(1);
+    setShowSellModal(true);
+  };
+
+  const handleSellCancel = () => {
+    setShowSellModal(false);
+    setSellingTurbo(null);
+    setSellQuantity(1);
+  };
+
+  const handleSellConfirm = async () => {
+    if (!sellingTurbo) return;
+
+    // Check if quantity is valid
+    if (sellQuantity <= 0) {
+      toast.error('Please enter a valid quantity to sell');
+      return;
+    }
+
+    // Check if we have enough stock
+    if (sellQuantity > sellingTurbo.quantity) {
+      toast.error(`Not enough quantity to sell. Available: ${sellingTurbo.quantity}`);
+      return;
+    }
+
+    // Ask for confirmation
+    if (window.confirm(`Do you really want to sell ${sellQuantity} turbo(s) of ${sellingTurbo.model}?`)) {
+      try {
+        // Call the existing sellTurbo function with the quantity
+        const response = await fetch(`${API_BASE_URL}/turbos/${sellingTurbo.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            quantity: sellingTurbo.quantity - sellQuantity
+          })
+        });
+
+        if (response.ok) {
+          toast.success(`Successfully sold ${sellQuantity} turbo(s)!`);
+          setShowSellModal(false);
+          setSellingTurbo(null);
+          setSellQuantity(1);
+          fetchAllTurbos(); // Refresh the data
+          fetchTurboStats(); // Refresh stats
+        } else {
+          const error = await response.json();
+          toast.error(error.message || 'Failed to sell turbo');
+        }
+      } catch (error) {
+        console.error('Error selling turbo:', error);
+        toast.error('Network error while selling turbo');
+      }
+    }
+  };
+
   const resetForm = () => {
     setNewTurboForm({
       model: '',
@@ -600,6 +682,7 @@ function App() {
       quantity: '',
       multipleModels: false,
       bigSmallVariants: false,
+      priority: false,
       bigModels: '',
       bigQuantity: '0',
       smallModels: '',
@@ -762,7 +845,7 @@ function App() {
             <div className="turbo-actions">
               <button 
                 className="action-btn sell-btn" 
-                onClick={() => sellTurbo(item.id || '')}
+                onClick={() => handleSellClick(item)}
                 disabled={!item.id || item.quantity <= 0}
               >
                 <span className="action-icon">💰</span>
@@ -783,9 +866,14 @@ function App() {
                 Delete
               </button>
             </div>
-                            <div className={`quantity-badge ${item.quantity === 0 ? 'out-of-stock' : item.quantity <= 1 ? 'low-stock' : 'in-stock'}`}>
+                            <div className={`quantity-badge ${item.quantity === 0 ? 'out-of-stock' : isLowStockItem(item.quantity, item.priority) ? 'low-stock' : 'in-stock'}`}>
               {item.quantity}
             </div>
+            {item.priority && (
+              <div className="priority-badge">
+                ⭐ Priority
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -948,6 +1036,19 @@ function App() {
                     className="checkbox-input"
                   />
                   <span className="checkbox-text">Big/Small Variants</span>
+                </label>
+              </div>
+              
+              <div className="form-group checkbox-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    name="priority"
+                    checked={newTurboForm.priority}
+                    onChange={handleInputChange}
+                    className="checkbox-input"
+                  />
+                  <span className="checkbox-text">Priority</span>
                 </label>
               </div>
             </div>
@@ -1120,6 +1221,17 @@ function App() {
                   />
                   <span className="checkbox-text">Big/Small Variants</span>
                 </label>
+                
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    name="priority"
+                    checked={newTurboForm.priority}
+                    onChange={handleInputChange}
+                    className="checkbox-input"
+                  />
+                  <span className="checkbox-text">Priority</span>
+                </label>
               </div>
             </div>
             
@@ -1209,6 +1321,81 @@ function App() {
                   Generate Order
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sell Modal Overlay */}
+      {showSellModal && sellingTurbo && (
+        <div className="modal-overlay" onClick={handleSellCancel}>
+          <div className="modal sell-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="sell-icon">💰</div>
+              <h2 className="modal-title">Sell Turbo</h2>
+            </div>
+            
+            <div className="modal-form">
+              <div className="sell-item-info">
+                <div className="sell-item-details">
+                  <div className="sell-item-id">ID: {sellingTurbo.id}</div>
+                  <div className="sell-item-model">Model: {sellingTurbo.model}</div>
+                  <div className="sell-item-location">Location: {sellingTurbo.location || sellingTurbo.bay}</div>
+                  <div className="sell-item-stock">
+                    Available Stock: <strong>{sellingTurbo.quantity}</strong>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="form-group">
+                <label htmlFor="sellQuantity">Quantity to Sell</label>
+                <div className="quantity-input-group">
+                  <button 
+                    className="quantity-btn minus-btn"
+                    onClick={() => setSellQuantity(Math.max(1, sellQuantity - 1))}
+                    disabled={sellQuantity <= 1}
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    id="sellQuantity"
+                    value={sellQuantity}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value) || 1;
+                      setSellQuantity(Math.max(1, Math.min(value, sellingTurbo.quantity)));
+                    }}
+                    className="quantity-input"
+                    min="1"
+                    max={sellingTurbo.quantity}
+                  />
+                  <button 
+                    className="quantity-btn plus-btn"
+                    onClick={() => setSellQuantity(Math.min(sellingTurbo.quantity, sellQuantity + 1))}
+                    disabled={sellQuantity >= sellingTurbo.quantity}
+                  >
+                    +
+                  </button>
+                </div>
+                {sellQuantity > sellingTurbo.quantity && (
+                  <div className="error-message">
+                    Not enough quantity to sell. Available: {sellingTurbo.quantity}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="modal-actions">
+              <button className="modal-btn cancel-btn" onClick={handleSellCancel}>
+                Cancel
+              </button>
+              <button 
+                className="modal-btn save-btn" 
+                onClick={handleSellConfirm}
+                disabled={sellQuantity > sellingTurbo.quantity || sellQuantity <= 0}
+              >
+                Sell Turbo
+              </button>
             </div>
           </div>
         </div>

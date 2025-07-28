@@ -337,6 +337,20 @@ body {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
 
+.priority-badge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  z-index: 1;
+}
+
 /* Enhanced Modal Styles */
 .modal-overlay {
   position: fixed;
@@ -920,6 +934,13 @@ body {
     right: 12px;
   }
   
+  .priority-badge {
+    font-size: 0.7rem;
+    padding: 3px 6px;
+    top: 12px;
+    left: 12px;
+  }
+  
   .modal {
     padding: 20px;
     margin: 12px;
@@ -1107,6 +1128,73 @@ body {
 .order-modal {
   max-width: 700px;
   max-height: 85vh;
+}
+
+/* Sell Modal Specific Styles */
+.sell-modal {
+  max-width: 500px;
+  max-height: 80vh;
+}
+
+.sell-icon {
+  font-size: 2rem;
+  color: #10b981;
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+  flex-shrink: 0;
+}
+
+.sell-item-info {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.sell-item-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sell-item-id {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.sell-item-model {
+  font-size: 1rem;
+  color: #374151;
+  font-weight: 600;
+}
+
+.sell-item-location {
+  font-size: 0.95rem;
+  color: #6b7280;
+}
+
+.sell-item-stock {
+  font-size: 1rem;
+  color: #059669;
+  font-weight: 600;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.error-message {
+  color: #ef4444;
+  font-size: 0.9rem;
+  margin-top: 8px;
+  font-weight: 500;
 }
 
 .modal-header {
@@ -1352,6 +1440,12 @@ body {
     padding: 24px;
   }
   
+  .sell-modal {
+    max-width: calc(100vw - 32px);
+    max-height: 75vh;
+    padding: 24px;
+  }
+  
   .modal-header {
     flex-direction: column;
     gap: 12px;
@@ -1418,6 +1512,11 @@ body {
   .order-modal {
     padding: 20px;
     max-height: 75vh;
+  }
+  
+  .sell-modal {
+    padding: 20px;
+    max-height: 70vh;
   }
   
   .modal-header {
