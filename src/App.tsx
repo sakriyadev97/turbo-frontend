@@ -593,22 +593,42 @@ function App() {
       return;
     }
     
-    // Check if model field is filled
-    if (!newTurboForm.model.trim()) {
-      toast.error('Please enter model name(s)');
-      return;
-    }
-    
     // Check if bay/location is filled
     if (!newTurboForm.bay.trim()) {
       toast.error('Please enter bay location');
       return;
     }
     
-    // Check if quantity is filled
-    if (!newTurboForm.quantity || parseInt(newTurboForm.quantity) <= 0) {
-      toast.error('Please enter a valid quantity');
-      return;
+    // Check validation based on form type
+    if (newTurboForm.bigSmallVariants) {
+      // Big/Small variants validation
+      if (!newTurboForm.bigModels.trim() && !newTurboForm.smallModels.trim()) {
+        toast.error('Please enter at least one model name (big or small)');
+        return;
+      }
+      
+      // Check quantities for entered models
+      if (newTurboForm.bigModels.trim() && (!newTurboForm.bigQuantity || parseInt(newTurboForm.bigQuantity) <= 0)) {
+        toast.error('Please enter a valid big quantity');
+        return;
+      }
+      
+      if (newTurboForm.smallModels.trim() && (!newTurboForm.smallQuantity || parseInt(newTurboForm.smallQuantity) <= 0)) {
+        toast.error('Please enter a valid small quantity');
+        return;
+      }
+    } else {
+      // Regular form validation
+      if (!newTurboForm.model.trim()) {
+        toast.error('Please enter model name(s)');
+        return;
+      }
+      
+      // Check if quantity is filled
+      if (!newTurboForm.quantity || parseInt(newTurboForm.quantity) <= 0) {
+        toast.error('Please enter a valid quantity');
+        return;
+      }
     }
 
     // Convert model string to array if multiple models
@@ -798,22 +818,42 @@ function App() {
   const handleEditSave = async () => {
     if (!editingTurbo) return;
 
-    // Check if model field is filled
-    if (!newTurboForm.model.trim()) {
-      toast.error('Please enter model name(s)');
-      return;
-    }
-    
     // Check if bay/location is filled
     if (!newTurboForm.bay.trim()) {
       toast.error('Please enter bay location');
       return;
     }
     
-    // Check if quantity is filled
-    if (!newTurboForm.quantity || parseInt(newTurboForm.quantity) <= 0) {
-      toast.error('Please enter a valid quantity');
-      return;
+    // Check validation based on form type
+    if (newTurboForm.bigSmallVariants) {
+      // Big/Small variants validation
+      if (!newTurboForm.bigModels.trim() && !newTurboForm.smallModels.trim()) {
+        toast.error('Please enter at least one model name (big or small)');
+        return;
+      }
+      
+      // Check quantities for entered models
+      if (newTurboForm.bigModels.trim() && (!newTurboForm.bigQuantity || parseInt(newTurboForm.bigQuantity) <= 0)) {
+        toast.error('Please enter a valid big quantity');
+        return;
+      }
+      
+      if (newTurboForm.smallModels.trim() && (!newTurboForm.smallQuantity || parseInt(newTurboForm.smallQuantity) <= 0)) {
+        toast.error('Please enter a valid small quantity');
+        return;
+      }
+    } else {
+      // Regular form validation
+      if (!newTurboForm.model.trim()) {
+        toast.error('Please enter model name(s)');
+        return;
+      }
+      
+      // Check if quantity is filled
+      if (!newTurboForm.quantity || parseInt(newTurboForm.quantity) <= 0) {
+        toast.error('Please enter a valid quantity');
+        return;
+      }
     }
 
     // Convert model string to array if multiple models
