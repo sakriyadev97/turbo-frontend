@@ -799,12 +799,18 @@ function App() {
 
   const sendOrderEmail = async (orders: any[]) => {
     try {
+      console.log('=== SENDING ORDER EMAIL ===');
+      console.log('Orders to send:', orders);
+      
       // Create email body with order details
       const orderDetails = orders.map(order => 
         `- Model: ${order.modelName}, Quantity: ${order.quantity}, Location: ${order.location}`
       ).join('\n');
       
       const emailBody = `Please order the following items:\n\n${orderDetails}\n\nThank you!`;
+      
+      console.log('Email body:', emailBody);
+      console.log('API URL:', `${API_BASE_URL}/email/send-order-email`);
       
       // Send email via backend
       const emailResponse = await fetch(`${API_BASE_URL}/email/send-order-email`, {
@@ -819,12 +825,16 @@ function App() {
         })
       });
       
+      console.log('Email response status:', emailResponse.status);
+      
       if (emailResponse.ok) {
-        console.log('Order email sent successfully');
+        const result = await emailResponse.json();
+        console.log('Email sent successfully:', result);
         toast.success('Order email sent successfully!');
       } else {
-        console.error('Failed to send order email');
-        toast.error('Failed to send order email');
+        const error = await emailResponse.json();
+        console.error('Failed to send order email:', error);
+        toast.error(`Failed to send order email: ${error.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error sending order email:', error);
@@ -1838,9 +1848,6 @@ function App() {
               <div className="order-actions">
                 <button className="modal-btn cancel-btn" onClick={handleOrderCancel}>
                   Cancel
-                </button>
-                <button className="modal-btn save-btn" onClick={handleGenerateOrder}>
-                  Generate Order
                 </button>
               </div>
             </div>
