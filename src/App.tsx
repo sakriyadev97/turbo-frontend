@@ -11,6 +11,7 @@ interface TurboItem {
   quantity: number;
   isLowStock: boolean;
   priority?: boolean; // Priority flag
+  allPartNumbers?: string[]; // Array of all part numbers for this item
 }
 
 interface NewTurboForm {
@@ -263,21 +264,24 @@ function App() {
             
             return items;
           } else {
-            // Regular turbo items
-            return (turbo.partNumbers || []).map((partNumber: string) => {
-              if (partNumber && partNumber.trim()) { // Only add if partNumber exists
-                return {
-                  id: partNumber,
-                  model: partNumber,
-                  location: turbo.location || 'No locationssss',
-                  bay: turbo.location || 'No location', // For backward compatibility
-                  quantity: turbo.quantity || 0,
-                  isLowStock: isLowStockItem(turbo.quantity || 0, turbo.priority || false),
-                  priority: turbo.priority || false
-                };
-              }
-              return null; // Skip invalid items
-            }).filter(Boolean); // Remove null items
+            // Regular turbo items - keep multiple part numbers together as one item
+            const validPartNumbers = (turbo.partNumbers || []).filter((partNumber: string) => 
+              partNumber && partNumber.trim()
+            );
+            
+            if (validPartNumbers.length > 0) {
+              return [{
+                id: validPartNumbers.join(', '), // Join multiple part numbers with commas
+                model: validPartNumbers.join(', '), // Display all part numbers together
+                location: turbo.location || 'No location',
+                bay: turbo.location || 'No location', // For backward compatibility
+                quantity: turbo.quantity || 0,
+                isLowStock: isLowStockItem(turbo.quantity || 0, turbo.priority || false),
+                priority: turbo.priority || false,
+                allPartNumbers: validPartNumbers // Keep original array for operations
+              }];
+            }
+            return [];
           }
         }).flat(); // Flatten the array of arrays
         
@@ -401,10 +405,11 @@ function App() {
         return;
       }
 
-      // We need to find the actual MongoDB document that contains this part number
-      // For now, let's try to update by part number in the backend
+      // Use the first part number for updating (since backend expects a single part number)
+      const partNumberToUpdate = id.split(',')[0].trim();
+      
       console.log('Sending update request with data:', {
-        partNumber: id,
+        partNumber: partNumberToUpdate,
         ...updateData
       });
       console.log('Priority field type:', typeof updateData.priority);
@@ -416,7 +421,7 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          partNumber: id,
+          partNumber: partNumberToUpdate,
           ...updateData
         })
       });
@@ -440,7 +445,10 @@ function App() {
 
   const deleteTurbo = async (id: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/turbos/delete-by-partnumber/${id}`, {
+      // If the id contains multiple part numbers (comma-separated), use the first one for deletion
+      const partNumberToDelete = id.split(',')[0].trim();
+      
+      const response = await fetch(`${API_BASE_URL}/turbos/delete-by-partnumber/${partNumberToDelete}`, {
         method: 'DELETE'
       });
 
@@ -474,13 +482,17 @@ function App() {
   React.useEffect(() => {
     if (editingTurbo) {
       console.log('Populating form with editingTurbo:', editingTurbo);
+      
+      // Check if this turbo has multiple part numbers
+      const hasMultipleModels = !!(editingTurbo.allPartNumbers && editingTurbo.allPartNumbers.length > 1);
+      
       setNewTurboForm({
         model: editingTurbo.model || '',
         bay: editingTurbo.location || editingTurbo.bay || '',
         quantity: editingTurbo.quantity?.toString() || '',
-        multipleModels: false,
+        multipleModels: hasMultipleModels,
         bigSmallVariants: false,
-        priority: editingTurbo.priority || false,
+        priority: !!editingTurbo.priority,
         bigModels: '',
         bigQuantity: '0',
         smallModels: '',
@@ -991,10 +1003,10 @@ function App() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            partNumber: sellingTurbo.id,
-            quantity: sellQuantity
-          })
+                  body: JSON.stringify({
+          partNumber: sellingTurbo.id.split(',')[0].trim(), // Use first part number for selling
+          quantity: sellQuantity
+        })
         });
 
         console.log('Response status:', response.status);
