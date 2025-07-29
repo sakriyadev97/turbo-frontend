@@ -607,6 +607,37 @@ function App() {
     setOrderQuantities({});
   };
 
+  const handleIndividualGenerateOrder = (item: TurboItem) => {
+    const quantity = orderQuantities[item.id] || 0;
+    if (quantity <= 0) {
+      toast.error('Please select a quantity to order');
+      return;
+    }
+
+    // Create order for this specific item
+    const newOrder: PendingOrder = {
+      id: `${item.id}-${Date.now()}`,
+      partNumber: item.id,
+      model: item.model,
+      location: item.location || item.bay || 'Unknown',
+      quantity,
+      orderDate: new Date().toISOString(),
+      status: 'pending' as const
+    };
+
+    setPendingOrders(prev => [...prev, newOrder]);
+    
+    // Clear this item's quantity from the form
+    setOrderQuantities(prev => {
+      const updated = { ...prev };
+      delete updated[item.id];
+      return updated;
+    });
+    
+    toast.success(`Generated order for ${item.model} (${quantity} units) and added to pending list!`);
+    console.log('Generated individual order:', newOrder);
+  };
+
   const handleGenerateOrder = () => {
     // Add orders to pending list
     const newOrders: PendingOrder[] = Object.entries(orderQuantities)
@@ -1467,12 +1498,12 @@ function App() {
             
             <div className="modal-form">
               <div className="instructions-box">
-                <strong>Instructions:</strong> Use +/- buttons to select quantities to order for any turbo item. Low stock items are highlighted. Click 'Generate Order' to create a printable document.
+                <strong>Instructions:</strong> Use +/- buttons to select quantities to order for low stock items. Click 'Generate Order' on individual items or use the main button for all selected items.
               </div>
               
               <div className="order-items-list">
-                {turboItems.map((item) => (
-                  <div key={item.id} className={`order-item-card ${isLowStockItem(item.quantity, item.priority) ? 'low-stock-item' : ''}`}>
+                {lowStockItems.map((item) => (
+                  <div key={item.id} className="order-item-card low-stock-item">
                     <div className="item-details">
                       <div className="item-id">{item.id}</div>
                       <div className="item-info">
@@ -1480,7 +1511,7 @@ function App() {
                         <span>Location: {item.location || item.bay}</span>
                         {item.priority && <span className="priority-indicator">⭐ Priority</span>}
                       </div>
-                      <div className={`stock-status ${item.quantity === 0 ? 'out-of-stock' : isLowStockItem(item.quantity, item.priority) ? 'low-stock' : 'in-stock'}`}>
+                      <div className={`stock-status ${item.quantity === 0 ? 'out-of-stock' : 'low-stock'}`}>
                         Current Stock: {item.quantity === 0 ? 'OUT OF STOCK' : `${item.quantity} left`}
                       </div>
                     </div>
@@ -1513,6 +1544,15 @@ function App() {
                           +
                         </button>
                       </div>
+                    </div>
+                    <div className="individual-order-actions">
+                      <button 
+                        className="modal-btn save-btn individual-order-btn"
+                        onClick={() => handleIndividualGenerateOrder(item)}
+                        disabled={(orderQuantities[item.id] || 0) <= 0}
+                      >
+                        Generate Order
+                      </button>
                     </div>
                   </div>
                 ))}
