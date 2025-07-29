@@ -320,7 +320,7 @@ function App() {
         console.log('Received pending orders data:', data);
         
         // Transform backend data to frontend format
-        const transformedOrders: PendingOrder[] = data.pendingOrders.map((order: any) => ({
+        const transformedOrders: PendingOrder[] = (data.pendingOrders || []).map((order: any) => ({
           id: order._id,
           partNumber: order.partNumber,
           model: order.modelName, // Backend uses modelName
@@ -334,11 +334,19 @@ function App() {
         console.log('Transformed pending orders:', transformedOrders);
       } else {
         console.error('Failed to fetch pending orders:', response.status);
-        toast.error('Failed to fetch pending orders');
+        // Don't show error for 404 or 500 status codes as they might be normal
+        if (response.status !== 404 && response.status !== 500) {
+          toast.error('Failed to fetch pending orders');
+        } else {
+          console.log('No pending orders found or server error, setting empty array');
+          setPendingOrders([]);
+        }
       }
     } catch (error) {
       console.error('Error fetching pending orders:', error);
-      toast.error('Network error while fetching pending orders');
+      // Don't show error for network issues, just set empty array
+      console.log('Network error while fetching pending orders, setting empty array');
+      setPendingOrders([]);
     }
   };
 
@@ -659,19 +667,29 @@ function App() {
     }
 
     try {
+      console.log('Creating individual pending order for:', item);
+      console.log('API URL:', `${API_BASE_URL}/api/pending-orders`);
+      
+      const orderData = {
+        partNumber: item.id,
+        modelName: item.model,
+        location: item.location || item.bay || 'Unknown',
+        quantity
+      };
+      
+      console.log('Order data:', orderData);
+      
       // Create order in the backend
       const response = await fetch(`${API_BASE_URL}/api/pending-orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          partNumber: item.id,
-          modelName: item.model,
-          location: item.location || item.bay || 'Unknown',
-          quantity
-        })
+        body: JSON.stringify(orderData)
       });
+
+      console.log('Response status:', response.status);
+      console.log('Response URL:', response.url);
 
       if (response.ok) {
         const result = await response.json();
@@ -690,6 +708,7 @@ function App() {
         toast.success(`Generated order for ${item.model} (${quantity} units) and added to pending list!`);
       } else {
         const error = await response.json();
+        console.log('Error response:', error);
         toast.error(error.error || 'Failed to create pending order');
       }
     } catch (error) {
