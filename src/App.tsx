@@ -12,6 +12,10 @@ interface TurboItem {
   isLowStock: boolean;
   priority?: boolean; // Priority flag
   allPartNumbers?: string[]; // Array of all part numbers for this item
+  bigPartNumbers?: string[]; // Big variant part numbers
+  smallPartNumbers?: string[]; // Small variant part numbers
+  bigQuantity?: number; // Big variant quantity
+  smallQuantity?: number; // Small variant quantity
 }
 
 interface NewTurboForm {
@@ -227,42 +231,42 @@ function App() {
           
           // Handle different data structures
           if (turbo.hasSizeOption && turbo.sizeVariants) {
-            // Big/Small variants - create separate items for each
-            const items: any[] = [];
+            // Big/Small variants - create single item with all variants
+            const bigPartNumbers = (turbo.sizeVariants.big?.partNumbers || []).filter((pn: string) => pn && pn.trim());
+            const smallPartNumbers = (turbo.sizeVariants.small?.partNumbers || []).filter((pn: string) => pn && pn.trim());
             
-            if (turbo.sizeVariants.big && turbo.sizeVariants.big.partNumbers) {
-              turbo.sizeVariants.big.partNumbers.forEach((partNumber: string) => {
-                if (partNumber && partNumber.trim()) { // Only add if partNumber exists
-                  items.push({
-                    id: partNumber,
-                    model: partNumber,
-                    location: turbo.location || 'No location',
-                    bay: turbo.location || 'No location', // For backward compatibility
-                    quantity: turbo.sizeVariants.big.quantity || 0,
-                    isLowStock: isLowStockItem(turbo.sizeVariants.big.quantity || 0, turbo.priority || false),
-                    priority: turbo.priority || false
-                  });
-                }
-              });
+            // Calculate total quantity
+            const bigQuantity = turbo.sizeVariants.big?.quantity || 0;
+            const smallQuantity = turbo.sizeVariants.small?.quantity || 0;
+            const totalQuantity = bigQuantity + smallQuantity;
+            
+            // Create display text
+            let displayText = '';
+            if (bigPartNumbers.length > 0) {
+              displayText += `Big: ${bigPartNumbers.join(', ')}`;
+            }
+            if (smallPartNumbers.length > 0) {
+              if (displayText) displayText += ' | ';
+              displayText += `Small: ${smallPartNumbers.join(', ')}`;
             }
             
-            if (turbo.sizeVariants.small && turbo.sizeVariants.small.partNumbers) {
-              turbo.sizeVariants.small.partNumbers.forEach((partNumber: string) => {
-                if (partNumber && partNumber.trim()) { // Only add if partNumber exists
-                  items.push({
-                    id: partNumber,
-                    model: partNumber,
-                    location: turbo.location || 'No location',
-                    bay: turbo.location || 'No location', // For backward compatibility
-                    quantity: turbo.sizeVariants.small.quantity || 0,
-                    isLowStock: isLowStockItem(turbo.sizeVariants.small.quantity || 0, turbo.priority || false),
-                    priority: turbo.priority || false
-                  });
-                }
-              });
+            if (displayText) {
+              return [{
+                id: displayText, // Use display text as ID for uniqueness
+                model: displayText,
+                location: turbo.location || 'No location',
+                bay: turbo.location || 'No location',
+                quantity: totalQuantity,
+                isLowStock: isLowStockItem(totalQuantity, turbo.priority || false),
+                priority: turbo.priority || false,
+                allPartNumbers: [...bigPartNumbers, ...smallPartNumbers], // Keep all part numbers for operations
+                bigPartNumbers: bigPartNumbers,
+                smallPartNumbers: smallPartNumbers,
+                bigQuantity: bigQuantity,
+                smallQuantity: smallQuantity
+              }];
             }
-            
-            return items;
+            return [];
           } else {
             // Regular turbo items - keep multiple part numbers together as one item
             const validPartNumbers = (turbo.partNumbers || []).filter((partNumber: string) => 
@@ -324,16 +328,18 @@ function App() {
         const data = await response.json();
         console.log('Received pending orders data:', data);
         
-        // Transform backend data to frontend format
-        const transformedOrders: PendingOrder[] = (data.pendingOrders || []).map((order: any) => ({
-          id: order._id,
-          partNumber: order.partNumber,
-          model: order.modelName, // Backend uses modelName
-          location: order.location,
-          quantity: order.quantity,
-          orderDate: new Date(order.orderDate).toISOString(),
-          status: order.status
-        }));
+        // Transform backend data to frontend format and filter out arrived orders
+        const transformedOrders: PendingOrder[] = (data.pendingOrders || [])
+          .filter((order: any) => order.status !== 'arrived') // Only show pending orders
+          .map((order: any) => ({
+            id: order._id,
+            partNumber: order.partNumber,
+            model: order.modelName, // Backend uses modelName
+            location: order.location,
+            quantity: order.quantity,
+            orderDate: new Date(order.orderDate).toISOString(),
+            status: order.status
+          }));
         
         setPendingOrders(transformedOrders);
         console.log('Transformed pending orders:', transformedOrders);
@@ -483,21 +489,40 @@ function App() {
     if (editingTurbo) {
       console.log('Populating form with editingTurbo:', editingTurbo);
       
-      // Check if this turbo has multiple part numbers
-      const hasMultipleModels = !!(editingTurbo.allPartNumbers && editingTurbo.allPartNumbers.length > 1);
+      // Check if this is a Big/Small variant turbo
+      const isBigSmallVariant = !!(editingTurbo.bigPartNumbers || editingTurbo.smallPartNumbers);
       
-      setNewTurboForm({
-        model: editingTurbo.model || '',
-        bay: editingTurbo.location || editingTurbo.bay || '',
-        quantity: editingTurbo.quantity?.toString() || '',
-        multipleModels: hasMultipleModels,
-        bigSmallVariants: false,
-        priority: !!editingTurbo.priority,
-        bigModels: '',
-        bigQuantity: '0',
-        smallModels: '',
-        smallQuantity: '0'
-      });
+      if (isBigSmallVariant) {
+        // Handle Big/Small variants
+        setNewTurboForm({
+          model: '',
+          bay: editingTurbo.location || editingTurbo.bay || '',
+          quantity: '',
+          multipleModels: false,
+          bigSmallVariants: true,
+          priority: !!editingTurbo.priority,
+          bigModels: editingTurbo.bigPartNumbers?.join(', ') || '',
+          bigQuantity: editingTurbo.bigQuantity?.toString() || '0',
+          smallModels: editingTurbo.smallPartNumbers?.join(', ') || '',
+          smallQuantity: editingTurbo.smallQuantity?.toString() || '0'
+        });
+      } else {
+        // Handle regular turbo
+        const hasMultipleModels = !!(editingTurbo.allPartNumbers && editingTurbo.allPartNumbers.length > 1);
+        
+        setNewTurboForm({
+          model: editingTurbo.model || '',
+          bay: editingTurbo.location || editingTurbo.bay || '',
+          quantity: editingTurbo.quantity?.toString() || '',
+          multipleModels: hasMultipleModels,
+          bigSmallVariants: false,
+          priority: !!editingTurbo.priority,
+          bigModels: '',
+          bigQuantity: '0',
+          smallModels: '',
+          smallQuantity: '0'
+        });
+      }
     }
   }, [editingTurbo]);
 
@@ -885,10 +910,14 @@ function App() {
 
     const updateData: any = {
       location: newTurboForm.bay,
-      quantity: parseInt(newTurboForm.quantity),
       hasSizeOption: newTurboForm.bigSmallVariants,
       priority: newTurboForm.priority, // Add priority flag
     };
+
+    // Only add quantity for regular form (not Big/Small variants)
+    if (!newTurboForm.bigSmallVariants) {
+      updateData.quantity = parseInt(newTurboForm.quantity);
+    }
 
     // Handle big/small variants
     if (newTurboForm.bigSmallVariants) {
@@ -980,6 +1009,9 @@ function App() {
     try {
       console.log('Marking order as arrived:', order);
       
+      // Extract the first part number for multiple models (e.g., "1234, 5674" -> "1234")
+      const partNumberToUpdate = order.partNumber.split(',')[0].trim();
+      
       // First, update the turbo quantity in the backend
       const turboResponse = await fetch(`${API_BASE_URL}/turbos/update-by-partnumber`, {
         method: 'PUT',
@@ -987,7 +1019,7 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          partNumber: order.partNumber,
+          partNumber: partNumberToUpdate,
           quantity: order.quantity,
           operation: 'add' // Add the ordered quantity to existing stock
         })
