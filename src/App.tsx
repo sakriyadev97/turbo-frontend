@@ -521,7 +521,7 @@ function App() {
     setIsLoading(true);
     
     try {
-      const response = await fetch('https://turbo-backend-henna.vercel.app/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -681,7 +681,7 @@ function App() {
       console.log('Order data:', orderData);
       
       // Create order in the backend
-      const response = await fetch(`${API_BASE_URL}/pending-orders`, {
+      const response = await fetch(`${API_BASE_URL}/pending-orders/create-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -740,7 +740,7 @@ function App() {
     try {
       // Create all orders in the backend
       const createPromises = ordersToCreate.map(order => 
-        fetch(`${API_BASE_URL}/pending-orders`, {
+        fetch(`${API_BASE_URL}/pending-orders/create-order`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
