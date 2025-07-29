@@ -576,16 +576,29 @@ function App() {
     
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
-    setNewTurboForm(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    
+    console.log('Input change - name:', name, 'type:', type, 'checked:', checked, 'value:', value);
+    
+    setNewTurboForm(prev => {
+      const newState = {
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      };
+      console.log('New form state:', newState);
+      return newState;
+    });
   };
 
   const handleSaveTurbo = () => {
+    console.log('=== SAVE TURBO DEBUG ===');
     console.log('handleSaveTurbo called - this should not happen from search!');
     console.log('Current search term:', searchTerm);
     console.log('Modal state:', showModal);
+    console.log('Form state:', newTurboForm);
+    console.log('Big/Small variants:', newTurboForm.bigSmallVariants);
+    console.log('Big models:', newTurboForm.bigModels);
+    console.log('Small models:', newTurboForm.smallModels);
+    console.log('=======================');
     
     // Prevent execution if modal is not open
     if (!showModal) {
@@ -638,10 +651,14 @@ function App() {
 
     const turboData: any = {
       location: newTurboForm.bay, // Changed from 'bay' to 'location' to match backend
-      quantity: parseInt(newTurboForm.quantity),
       hasSizeOption: newTurboForm.bigSmallVariants, // Backend expects this field name
       priority: newTurboForm.priority, // Add priority flag
     };
+
+    // Only add quantity for regular form (not Big/Small variants)
+    if (!newTurboForm.bigSmallVariants) {
+      turboData.quantity = parseInt(newTurboForm.quantity);
+    }
 
     // Handle big/small variants
     if (newTurboForm.bigSmallVariants) {
