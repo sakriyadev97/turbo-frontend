@@ -807,7 +807,7 @@ function App() {
       const emailBody = `Please order the following items:\n\n${orderDetails}\n\nThank you!`;
       
       // Send email via backend
-      const emailResponse = await fetch(`${API_BASE_URL}/send-order-email`, {
+      const emailResponse = await fetch(`${API_BASE_URL}/email/send-order-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
