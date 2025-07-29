@@ -440,7 +440,7 @@ function App() {
 
   const deleteTurbo = async (id: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/turbos/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/turbos/delete-by-partnumber/${id}`, {
         method: 'DELETE'
       });
 
