@@ -782,6 +782,10 @@ function App() {
           return updated;
         });
         
+        // Send order email for this individual order
+        console.log('=== SENDING INDIVIDUAL ORDER EMAIL ===');
+        await sendOrderEmail([orderData]);
+        
         // Refresh pending orders from backend
         await fetchPendingOrders();
         
