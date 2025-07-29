@@ -600,6 +600,11 @@ function App() {
     console.log('Small models:', newTurboForm.smallModels);
     console.log('=======================');
     
+    // Debug validation state
+    console.log('VALIDATION DEBUG - bigSmallVariants:', newTurboForm.bigSmallVariants);
+    console.log('VALIDATION DEBUG - bigModels:', newTurboForm.bigModels);
+    console.log('VALIDATION DEBUG - smallModels:', newTurboForm.smallModels);
+    
     // Prevent execution if modal is not open
     if (!showModal) {
       console.log('Modal not open, preventing save');
