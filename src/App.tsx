@@ -797,6 +797,41 @@ function App() {
     }
   };
 
+  const sendOrderEmail = async (orders: any[]) => {
+    try {
+      // Create email body with order details
+      const orderDetails = orders.map(order => 
+        `- Model: ${order.modelName}, Quantity: ${order.quantity}, Location: ${order.location}`
+      ).join('\n');
+      
+      const emailBody = `Please order the following items:\n\n${orderDetails}\n\nThank you!`;
+      
+      // Send email via backend
+      const emailResponse = await fetch(`${API_BASE_URL}/send-order-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subject: 'New Turbo Order Request',
+          body: emailBody,
+          orders: orders
+        })
+      });
+      
+      if (emailResponse.ok) {
+        console.log('Order email sent successfully');
+        toast.success('Order email sent successfully!');
+      } else {
+        console.error('Failed to send order email');
+        toast.error('Failed to send order email');
+      }
+    } catch (error) {
+      console.error('Error sending order email:', error);
+      toast.error('Network error while sending order email');
+    }
+  };
+
   const handleGenerateOrder = async () => {
     // Get all orders with quantities > 0
     const ordersToCreate = Object.entries(orderQuantities)
@@ -834,6 +869,10 @@ function App() {
       if (failedResponses.length === 0) {
         // All orders created successfully
         toast.success(`Generated ${ordersToCreate.length} order(s) and added to pending list!`);
+        
+        // Send order email
+        await sendOrderEmail(ordersToCreate);
+        
         setShowOrderModal(false);
         setOrderQuantities({});
         
