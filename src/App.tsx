@@ -313,7 +313,8 @@ function App() {
   const fetchPendingOrders = async () => {
     try {
       console.log('Fetching pending orders...');
-      const response = await fetch(`${API_BASE_URL}/api/pending-orders`);
+      console.log('Full API URL:', `${API_BASE_URL}/pending-orders`);
+      const response = await fetch(`${API_BASE_URL}/pending-orders`);
       
       if (response.ok) {
         const data = await response.json();
@@ -668,7 +669,7 @@ function App() {
 
     try {
       console.log('Creating individual pending order for:', item);
-      console.log('API URL:', `${API_BASE_URL}/api/pending-orders`);
+      console.log('API URL:', `${API_BASE_URL}/pending-orders`);
       
       const orderData = {
         partNumber: item.id,
@@ -680,7 +681,7 @@ function App() {
       console.log('Order data:', orderData);
       
       // Create order in the backend
-      const response = await fetch(`${API_BASE_URL}/api/pending-orders`, {
+      const response = await fetch(`${API_BASE_URL}/pending-orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -739,7 +740,7 @@ function App() {
     try {
       // Create all orders in the backend
       const createPromises = ordersToCreate.map(order => 
-        fetch(`${API_BASE_URL}/api/pending-orders`, {
+        fetch(`${API_BASE_URL}/pending-orders`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -925,7 +926,7 @@ function App() {
         console.log('Turbo update success result:', turboResult);
         
         // Now mark the pending order as arrived in the backend
-        const orderResponse = await fetch(`${API_BASE_URL}/api/pending-orders/${order.id}/arrived`, {
+        const orderResponse = await fetch(`${API_BASE_URL}/pending-orders/${order.id}/arrived`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
