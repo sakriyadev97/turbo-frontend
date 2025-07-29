@@ -878,9 +878,12 @@ function App() {
       
       if (failedResponses.length === 0) {
         // All orders created successfully
+        console.log('=== ORDERS CREATED SUCCESSFULLY ===');
+        console.log('Orders created:', ordersToCreate);
         toast.success(`Generated ${ordersToCreate.length} order(s) and added to pending list!`);
         
         // Send order email
+        console.log('=== TRIGGERING EMAIL ===');
         await sendOrderEmail(ordersToCreate);
         
         setShowOrderModal(false);
@@ -889,6 +892,8 @@ function App() {
         // Refresh pending orders from backend
         await fetchPendingOrders();
       } else {
+        console.log('=== ORDERS FAILED ===');
+        console.log('Failed responses:', failedResponses);
         toast.error(`Failed to create ${failedResponses.length} order(s)`);
       }
     } catch (error) {
