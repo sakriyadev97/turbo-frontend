@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
@@ -44,6 +44,7 @@ interface PendingOrder {
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -88,6 +89,63 @@ function App() {
   // Debug log to check which URL is being used
   console.log('API_BASE_URL:', API_BASE_URL);
 
+  // Session persistence functions
+  const checkSession = () => {
+    const session = localStorage.getItem('turbo_session');
+    if (session) {
+      try {
+        const sessionData = JSON.parse(session);
+        const now = Date.now();
+        const sessionAge = now - sessionData.timestamp;
+        const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+        
+        // Check if session is still valid
+        if (sessionData.timestamp && sessionAge < maxAge) {
+          // Warn user if session is about to expire (within 1 hour)
+          const warningThreshold = 23 * 60 * 60 * 1000; // 23 hours
+          if (sessionAge > warningThreshold) {
+            const remainingHours = Math.ceil((maxAge - sessionAge) / (60 * 60 * 1000));
+            toast.warning(`Session expires in ${remainingHours} hour(s). Please save your work.`);
+          }
+          return true;
+        } else {
+          // Session expired, clear it
+          localStorage.removeItem('turbo_session');
+          toast.info('Session expired. Please log in again.');
+        }
+      } catch (error) {
+        console.error('Error parsing session data:', error);
+        localStorage.removeItem('turbo_session');
+      }
+    }
+    return false;
+  };
+
+  const saveSession = () => {
+    const sessionData = {
+      timestamp: Date.now(),
+      username: loginForm.username
+    };
+    localStorage.setItem('turbo_session', JSON.stringify(sessionData));
+  };
+
+  const refreshSession = () => {
+    const session = localStorage.getItem('turbo_session');
+    if (session) {
+      try {
+        const sessionData = JSON.parse(session);
+        sessionData.timestamp = Date.now();
+        localStorage.setItem('turbo_session', JSON.stringify(sessionData));
+      } catch (error) {
+        console.error('Error refreshing session:', error);
+      }
+    }
+  };
+
+  const clearSession = () => {
+    localStorage.removeItem('turbo_session');
+  };
+
   // Helper function to determine if an item is low stock
   const isLowStockItem = (quantity: number, priority: boolean = false): boolean => {
     if (priority) {
@@ -95,6 +153,50 @@ function App() {
     }
     return quantity <= 1; // Regular items: low stock if 1 or less
   };
+
+  // Helper function to refresh data with loading state
+  const refreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        fetchAllTurbos(),
+        fetchTurboStats()
+      ]);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Check for existing session on component mount
+  useEffect(() => {
+    if (checkSession()) {
+      setIsAuthenticated(true);
+      console.log('Session restored from localStorage');
+    }
+  }, []);
+
+  // Refresh session on user activity
+  useEffect(() => {
+    if (isAuthenticated) {
+      const handleUserActivity = () => {
+        refreshSession();
+      };
+
+      // Refresh session on user interactions
+      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+      events.forEach(event => {
+        document.addEventListener(event, handleUserActivity, { passive: true });
+      });
+
+      return () => {
+        events.forEach(event => {
+          document.removeEventListener(event, handleUserActivity);
+        });
+      };
+    }
+  }, [isAuthenticated]);
 
   // API Functions
   const fetchAllTurbos = async () => {
@@ -223,8 +325,10 @@ function App() {
           smallModels: '',
           smallQuantity: '0'
         });
-        fetchAllTurbos(); // Refresh all data instead of adding raw response
-        fetchTurboStats(); // Refresh stats
+        // Add a small delay to ensure backend has processed the addition
+        setTimeout(() => {
+          refreshData();
+        }, 500);
       } else {
         const error = await response.json();
         toast.error(error.message || 'Failed to add turbo');
@@ -267,8 +371,10 @@ function App() {
       if (response.ok) {
         const result = await response.json();
         toast.success('Turbo updated successfully!');
-        fetchAllTurbos(); // Refresh all data
-        fetchTurboStats(); // Refresh stats
+        // Add a small delay to ensure backend has processed the update
+        setTimeout(() => {
+          refreshData();
+        }, 500);
       } else {
         const error = await response.json();
         toast.error(error.message || 'Failed to update turbo');
@@ -286,9 +392,11 @@ function App() {
       });
 
       if (response.ok) {
-        setTurboItems(prev => Array.isArray(prev) ? prev.filter(item => item.id !== id) : []);
         toast.success('Turbo deleted successfully!');
-        fetchTurboStats(); // Refresh stats
+        // Add a small delay to ensure backend has processed the deletion
+        setTimeout(() => {
+          refreshData();
+        }, 500);
       } else {
         const error = await response.json();
         toast.error(error.message || 'Failed to delete turbo');
@@ -376,6 +484,7 @@ function App() {
       if (response.ok) {
         // Login successful
         setIsAuthenticated(true);
+        saveSession(); // Save session to localStorage
         setLoginForm({ username: '', password: '' });
         toast.success('Login successful!');
       } else {
@@ -392,6 +501,8 @@ function App() {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
+    clearSession(); // Clear session from localStorage
+    toast.success('Logged out successfully!');
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -679,9 +790,10 @@ function App() {
           )
         );
         
-        // Refresh turbo data
-        fetchAllTurbos();
-        fetchTurboStats();
+        // Add a small delay to ensure backend has processed the quantity update
+        setTimeout(() => {
+          refreshData();
+        }, 500);
         
         toast.success(`Order for ${order.model} marked as arrived!`);
       } else {
@@ -692,12 +804,6 @@ function App() {
       console.error('Error marking order as arrived:', error);
       toast.error('Network error while updating order status');
     }
-  };
-
-  const handleIndividualOrder = (turbo: TurboItem) => {
-    // Set up order quantities for this specific turbo
-    setOrderQuantities({ [turbo.id]: 1 });
-    setShowOrderModal(true);
   };
 
   const handleSellConfirm = async () => {
@@ -743,8 +849,10 @@ function App() {
           setShowSellModal(false);
           setSellingTurbo(null);
           setSellQuantity(1);
-          fetchAllTurbos(); // Refresh the data
-          fetchTurboStats(); // Refresh stats
+          // Add a small delay to ensure backend has processed the sale
+          setTimeout(() => {
+            refreshData();
+          }, 500);
         } else {
           const error = await response.json();
           console.log('Error response:', error);
@@ -855,6 +963,12 @@ function App() {
           <p className="header-subtitle">Manage your turbo inventory with precision and efficiency.</p>
         </div>
         <div className="header-right">
+          {isRefreshing && (
+            <div className="refresh-indicator">
+              <span className="refresh-icon">🔄</span>
+              <span className="refresh-text">Refreshing...</span>
+            </div>
+          )}
           <button className="logout-btn" onClick={handleLogout}>
             <span className="logout-icon">🚪</span>
             Logout
@@ -952,13 +1066,6 @@ function App() {
               >
                 <span className="action-icon">✏️</span>
                 Edit
-              </button>
-              <button 
-                className="action-btn order-btn"
-                onClick={() => handleIndividualOrder(item)}
-              >
-                <span className="action-icon">📋</span>
-                Order
               </button>
               <button 
                 className="action-btn delete-btn"
@@ -1355,24 +1462,25 @@ function App() {
           <div className="modal order-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="order-icon">📋</div>
-              <h2 className="modal-title">Create Purchase Order - Low Stock Items</h2>
+              <h2 className="modal-title">Create Purchase Order</h2>
             </div>
             
             <div className="modal-form">
               <div className="instructions-box">
-                <strong>Instructions:</strong> Use +/- buttons to select quantities to order for each low stock item. Click 'Generate Order' to create a printable document.
+                <strong>Instructions:</strong> Use +/- buttons to select quantities to order for any turbo item. Low stock items are highlighted. Click 'Generate Order' to create a printable document.
               </div>
               
               <div className="order-items-list">
-                {lowStockItems.map((item) => (
-                  <div key={item.id} className="order-item-card">
+                {turboItems.map((item) => (
+                  <div key={item.id} className={`order-item-card ${isLowStockItem(item.quantity, item.priority) ? 'low-stock-item' : ''}`}>
                     <div className="item-details">
                       <div className="item-id">{item.id}</div>
                       <div className="item-info">
-                        <span>ID: {item.id}</span>
-                        <span>Bay: {item.bay}</span>
+                        <span>Model: {item.model}</span>
+                        <span>Location: {item.location || item.bay}</span>
+                        {item.priority && <span className="priority-indicator">⭐ Priority</span>}
                       </div>
-                      <div className={`stock-status ${item.quantity === 0 ? 'out-of-stock' : 'low-stock'}`}>
+                      <div className={`stock-status ${item.quantity === 0 ? 'out-of-stock' : isLowStockItem(item.quantity, item.priority) ? 'low-stock' : 'in-stock'}`}>
                         Current Stock: {item.quantity === 0 ? 'OUT OF STOCK' : `${item.quantity} left`}
                       </div>
                     </div>
