@@ -160,7 +160,8 @@ function App() {
     try {
       await Promise.all([
         fetchAllTurbos(),
-        fetchTurboStats()
+        fetchTurboStats(),
+        fetchPendingOrders()
       ]);
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -195,6 +196,16 @@ function App() {
           document.removeEventListener(event, handleUserActivity);
         });
       };
+    }
+  }, [isAuthenticated]);
+
+  // Fetch data when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('User authenticated, fetching data...');
+      fetchAllTurbos();
+      fetchTurboStats();
+      fetchPendingOrders();
     }
   }, [isAuthenticated]);
 
@@ -295,6 +306,39 @@ function App() {
     } catch (error) {
       console.error('Error fetching stats:', error);
       toast.error('Network error while fetching statistics');
+    }
+  };
+
+  // Fetch all pending orders from the backend
+  const fetchPendingOrders = async () => {
+    try {
+      console.log('Fetching pending orders...');
+      const response = await fetch(`${API_BASE_URL}/api/pending-orders`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Received pending orders data:', data);
+        
+        // Transform backend data to frontend format
+        const transformedOrders: PendingOrder[] = data.pendingOrders.map((order: any) => ({
+          id: order._id,
+          partNumber: order.partNumber,
+          model: order.modelName, // Backend uses modelName
+          location: order.location,
+          quantity: order.quantity,
+          orderDate: new Date(order.orderDate).toISOString(),
+          status: order.status
+        }));
+        
+        setPendingOrders(transformedOrders);
+        console.log('Transformed pending orders:', transformedOrders);
+      } else {
+        console.error('Failed to fetch pending orders:', response.status);
+        toast.error('Failed to fetch pending orders');
+      }
+    } catch (error) {
+      console.error('Error fetching pending orders:', error);
+      toast.error('Network error while fetching pending orders');
     }
   };
 
@@ -607,60 +651,102 @@ function App() {
     setOrderQuantities({});
   };
 
-  const handleIndividualGenerateOrder = (item: TurboItem) => {
+  const handleIndividualGenerateOrder = async (item: TurboItem) => {
     const quantity = orderQuantities[item.id] || 0;
     if (quantity <= 0) {
       toast.error('Please select a quantity to order');
       return;
     }
 
-    // Create order for this specific item
-    const newOrder: PendingOrder = {
-      id: `${item.id}-${Date.now()}`,
-      partNumber: item.id,
-      model: item.model,
-      location: item.location || item.bay || 'Unknown',
-      quantity,
-      orderDate: new Date().toISOString(),
-      status: 'pending' as const
-    };
+    try {
+      // Create order in the backend
+      const response = await fetch(`${API_BASE_URL}/api/pending-orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          partNumber: item.id,
+          modelName: item.model,
+          location: item.location || item.bay || 'Unknown',
+          quantity
+        })
+      });
 
-    setPendingOrders(prev => [...prev, newOrder]);
-    
-    // Clear this item's quantity from the form
-    setOrderQuantities(prev => {
-      const updated = { ...prev };
-      delete updated[item.id];
-      return updated;
-    });
-    
-    toast.success(`Generated order for ${item.model} (${quantity} units) and added to pending list!`);
-    console.log('Generated individual order:', newOrder);
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Created pending order:', result);
+        
+        // Clear this item's quantity from the form
+        setOrderQuantities(prev => {
+          const updated = { ...prev };
+          delete updated[item.id];
+          return updated;
+        });
+        
+        // Refresh pending orders from backend
+        await fetchPendingOrders();
+        
+        toast.success(`Generated order for ${item.model} (${quantity} units) and added to pending list!`);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to create pending order');
+      }
+    } catch (error) {
+      console.error('Error creating pending order:', error);
+      toast.error('Network error while creating pending order');
+    }
   };
 
-  const handleGenerateOrder = () => {
-    // Add orders to pending list
-    const newOrders: PendingOrder[] = Object.entries(orderQuantities)
+  const handleGenerateOrder = async () => {
+    // Get all orders with quantities > 0
+    const ordersToCreate = Object.entries(orderQuantities)
       .filter(([_, quantity]) => quantity > 0)
       .map(([partNumber, quantity]) => {
         const turbo = turboItems.find(item => item.id === partNumber);
         return {
-          id: `${partNumber}-${Date.now()}`,
           partNumber,
-          model: turbo?.model || partNumber,
+          modelName: turbo?.model || partNumber,
           location: turbo?.location || turbo?.bay || 'Unknown',
-          quantity,
-          orderDate: new Date().toISOString(),
-          status: 'pending' as const
+          quantity
         };
       });
 
-    setPendingOrders(prev => [...prev, ...newOrders]);
-    
-    toast.success(`Generated ${newOrders.length} order(s) and added to pending list!`);
-    console.log('Generated orders:', newOrders);
-    setShowOrderModal(false);
-    setOrderQuantities({});
+    if (ordersToCreate.length === 0) {
+      toast.error('Please select quantities to order');
+      return;
+    }
+
+    try {
+      // Create all orders in the backend
+      const createPromises = ordersToCreate.map(order => 
+        fetch(`${API_BASE_URL}/api/pending-orders`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(order)
+        })
+      );
+
+      const responses = await Promise.all(createPromises);
+      const failedResponses = responses.filter(response => !response.ok);
+      
+      if (failedResponses.length === 0) {
+        // All orders created successfully
+        toast.success(`Generated ${ordersToCreate.length} order(s) and added to pending list!`);
+        setShowOrderModal(false);
+        setOrderQuantities({});
+        
+        // Refresh pending orders from backend
+        await fetchPendingOrders();
+      } else {
+        toast.error(`Failed to create ${failedResponses.length} order(s)`);
+      }
+    } catch (error) {
+      console.error('Error creating pending orders:', error);
+      toast.error('Network error while creating pending orders');
+    }
   };
 
   const handleQuantityChange = (itemId: string, change: number) => {
@@ -798,8 +884,10 @@ function App() {
 
   const handleOrderArrived = async (order: PendingOrder) => {
     try {
-      // Update the turbo quantity in the backend
-      const response = await fetch(`${API_BASE_URL}/turbos/update-by-partnumber`, {
+      console.log('Marking order as arrived:', order);
+      
+      // First, update the turbo quantity in the backend
+      const turboResponse = await fetch(`${API_BASE_URL}/turbos/update-by-partnumber`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -811,24 +899,43 @@ function App() {
         })
       });
 
-      if (response.ok) {
-        // Mark order as arrived
-        setPendingOrders(prev => 
-          prev.map(o => 
-            o.id === order.id 
-              ? { ...o, status: 'arrived' as const }
-              : o
-          )
-        );
+      console.log('Turbo update response status:', turboResponse.status);
+      
+      if (turboResponse.ok) {
+        const turboResult = await turboResponse.json();
+        console.log('Turbo update success result:', turboResult);
         
-        // Add a small delay to ensure backend has processed the quantity update
-        setTimeout(() => {
-          refreshData();
-        }, 500);
+        // Now mark the pending order as arrived in the backend
+        const orderResponse = await fetch(`${API_BASE_URL}/api/pending-orders/${order.id}/arrived`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        console.log('Order status update response status:', orderResponse.status);
         
-        toast.success(`Order for ${order.model} marked as arrived!`);
+        if (orderResponse.ok) {
+          const orderResult = await orderResponse.json();
+          console.log('Order status update success result:', orderResult);
+          
+          // Refresh pending orders from backend
+          await fetchPendingOrders();
+          
+          // Add a small delay to ensure backend has processed the quantity update
+          setTimeout(() => {
+            refreshData();
+          }, 500);
+          
+          toast.success(`Order for ${order.model} marked as arrived! Quantity added to stock.`);
+        } else {
+          const error = await orderResponse.json();
+          console.log('Order status update error response:', error);
+          toast.error(error.error || 'Failed to update order status');
+        }
       } else {
-        const error = await response.json();
+        const error = await turboResponse.json();
+        console.log('Turbo update error response:', error);
         toast.error(error.error || 'Failed to update turbo quantity');
       }
     } catch (error) {
