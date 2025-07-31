@@ -91,8 +91,7 @@ function App() {
   const API_BASE_URL =  'https://turbo-backend-henna.vercel.app/api';
   // const API_BASE_URL =  'http://localhost:5000/api';
   
-  // Debug log to check which URL is being used
-  console.log('API_BASE_URL:', API_BASE_URL);
+
 
   // Session persistence functions
   const checkSession = () => {
@@ -179,7 +178,6 @@ function App() {
   useEffect(() => {
     if (checkSession()) {
       setIsAuthenticated(true);
-      console.log('Session restored from localStorage');
     }
   }, []);
 
@@ -207,7 +205,6 @@ function App() {
   // Fetch data when authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('User authenticated, fetching data...');
       fetchAllTurbos();
       fetchTurboStats();
       fetchPendingOrders();
@@ -220,14 +217,12 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/turbos`);
       if (response.ok) {
         const data = await response.json();
-        console.log('Raw API response:', data); // Debug log
         
         // Backend returns { turbos: [...] }
         const turbosArray = data.turbos || [];
         
         // Transform backend data to frontend format
         const transformedTurbos = turbosArray.map((turbo: any) => {
-          console.log('Processing turbo:', turbo); // Debug each turbo item
           
           // Handle different data structures
           if (turbo.hasSizeOption && turbo.sizeVariants) {
@@ -289,7 +284,6 @@ function App() {
           }
         }).flat(); // Flatten the array of arrays
         
-        console.log('Transformed turbos:', transformedTurbos); // Debug log
         setTurboItems(transformedTurbos);
       } else {
         toast.error('Failed to fetch turbo items');
@@ -320,13 +314,10 @@ function App() {
   // Fetch all pending orders from the backend
   const fetchPendingOrders = async () => {
     try {
-      console.log('Fetching pending orders...');
-      console.log('Full API URL:', `${API_BASE_URL}/all-pending-orders`);
       const response = await fetch(`${API_BASE_URL}/all-pending-orders`);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Received pending orders data:', data);
         
         // Transform backend data to frontend format and filter out arrived orders
         const transformedOrders: PendingOrder[] = (data.pendingOrders || [])
@@ -342,21 +333,16 @@ function App() {
           }));
         
         setPendingOrders(transformedOrders);
-        console.log('Transformed pending orders:', transformedOrders);
       } else {
-        console.error('Failed to fetch pending orders:', response.status);
         // Don't show error for 404 or 500 status codes as they might be normal
         if (response.status !== 404 && response.status !== 500) {
           toast.error('Failed to fetch pending orders');
         } else {
-          console.log('No pending orders found or server error, setting empty array');
           setPendingOrders([]);
         }
       }
     } catch (error) {
-      console.error('Error fetching pending orders:', error);
       // Don't show error for network issues, just set empty array
-      console.log('Network error while fetching pending orders, setting empty array');
       setPendingOrders([]);
     }
   };
@@ -373,7 +359,6 @@ function App() {
 
       if (response.ok) {
         const newTurbo = await response.json();
-        console.log('Backend response for new turbo:', newTurbo); // Debug log
         toast.success('Turbo added successfully!');
         setShowModal(false);
         setNewTurboForm({
@@ -414,12 +399,7 @@ function App() {
       // Use the first part number for updating (since backend expects a single part number)
       const partNumberToUpdate = id.split(',')[0].trim();
       
-      console.log('Sending update request with data:', {
-        partNumber: partNumberToUpdate,
-        ...updateData
-      });
-      console.log('Priority field type:', typeof updateData.priority);
-      console.log('Priority field value:', updateData.priority);
+
       
       const response = await fetch(`${API_BASE_URL}/turbos/update-by-partnumber`, {
         method: 'PUT',
@@ -487,7 +467,6 @@ function App() {
   // Populate form when editing
   React.useEffect(() => {
     if (editingTurbo) {
-      console.log('Populating form with editingTurbo:', editingTurbo);
       
       // Check if this is a Big/Small variant turbo
       const isBigSmallVariant = !!(editingTurbo.bigPartNumbers || editingTurbo.smallPartNumbers);
@@ -596,43 +575,21 @@ function App() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    console.log('handleInputChange called for:', e.target.name, 'value:', e.target.value);
-    console.log('Modal state when handleInputChange called:', showModal);
-    
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
-    
-    console.log('Input change - name:', name, 'type:', type, 'checked:', checked, 'value:', value);
     
     setNewTurboForm(prev => {
       const newState = {
         ...prev,
         [name]: type === 'checkbox' ? checked : value
       };
-      console.log('New form state:', newState);
       return newState;
     });
   };
 
   const handleSaveTurbo = () => {
-    console.log('=== SAVE TURBO DEBUG ===');
-    console.log('handleSaveTurbo called - this should not happen from search!');
-    console.log('Current search term:', searchTerm);
-    console.log('Modal state:', showModal);
-    console.log('Form state:', newTurboForm);
-    console.log('Big/Small variants:', newTurboForm.bigSmallVariants);
-    console.log('Big models:', newTurboForm.bigModels);
-    console.log('Small models:', newTurboForm.smallModels);
-    console.log('=======================');
-    
-    // Debug validation state
-    console.log('VALIDATION DEBUG - bigSmallVariants:', newTurboForm.bigSmallVariants);
-    console.log('VALIDATION DEBUG - bigModels:', newTurboForm.bigModels);
-    console.log('VALIDATION DEBUG - smallModels:', newTurboForm.smallModels);
-    
     // Prevent execution if modal is not open
     if (!showModal) {
-      console.log('Modal not open, preventing save');
       return;
     }
     
@@ -714,7 +671,6 @@ function App() {
       turboData.partNumbers = modelArray;
     }
 
-    console.log('Sending turbo data:', turboData); // Debug log
     addTurbo(turboData);
   };
 
@@ -747,17 +703,12 @@ function App() {
     }
 
     try {
-      console.log('Creating individual pending order for:', item);
-      console.log('API URL:', `${API_BASE_URL}/pending-orders`);
-      
       const orderData = {
         partNumber: item.id,
         modelName: item.model,
         location: item.location || item.bay || 'Unknown',
         quantity
       };
-      
-      console.log('Order data:', orderData);
       
       // Create order in the backend
       const response = await fetch(`${API_BASE_URL}/create-order`, {
@@ -768,12 +719,8 @@ function App() {
         body: JSON.stringify(orderData)
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response URL:', response.url);
-
       if (response.ok) {
         const result = await response.json();
-        console.log('Created pending order:', result);
         
         // Clear this item's quantity from the form
         setOrderQuantities(prev => {
@@ -783,7 +730,6 @@ function App() {
         });
         
         // Send order email for this individual order
-        console.log('=== SENDING INDIVIDUAL ORDER EMAIL ===');
         await sendOrderEmail([orderData]);
         
         // Refresh pending orders from backend
@@ -792,29 +738,21 @@ function App() {
         toast.success(`Generated order for ${item.model} (${quantity} units) and added to pending list!`);
       } else {
         const error = await response.json();
-        console.log('Error response:', error);
         toast.error(error.error || 'Failed to create pending order');
       }
     } catch (error) {
-      console.error('Error creating pending order:', error);
       toast.error('Network error while creating pending order');
     }
   };
 
   const sendOrderEmail = async (orders: any[]) => {
     try {
-      console.log('=== SENDING ORDER EMAIL ===');
-      console.log('Orders to send:', orders);
-      
       // Create email body with order details
       const orderDetails = orders.map(order => 
         `- Model: ${order.modelName}, Quantity: ${order.quantity}, Location: ${order.location}`
       ).join('\n');
       
       const emailBody = `Please order the following items:\n\n${orderDetails}\n\nThank you!`;
-      
-      console.log('Email body:', emailBody);
-      console.log('API URL:', `${API_BASE_URL}/email/send-order-email`);
       
       // Send email via backend
       const emailResponse = await fetch(`${API_BASE_URL}/email/send-order-email`, {
@@ -829,19 +767,14 @@ function App() {
         })
       });
       
-      console.log('Email response status:', emailResponse.status);
-      
       if (emailResponse.ok) {
         const result = await emailResponse.json();
-        console.log('Email sent successfully:', result);
         toast.success('Order email sent successfully!');
       } else {
         const error = await emailResponse.json();
-        console.error('Failed to send order email:', error);
         toast.error(`Failed to send order email: ${error.error || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Error sending order email:', error);
       toast.error('Network error while sending order email');
     }
   };
@@ -882,12 +815,9 @@ function App() {
       
       if (failedResponses.length === 0) {
         // All orders created successfully
-        console.log('=== ORDERS CREATED SUCCESSFULLY ===');
-        console.log('Orders created:', ordersToCreate);
         toast.success(`Generated ${ordersToCreate.length} order(s) and added to pending list!`);
         
         // Send order email
-        console.log('=== TRIGGERING EMAIL ===');
         await sendOrderEmail(ordersToCreate);
         
         setShowOrderModal(false);
@@ -896,12 +826,9 @@ function App() {
         // Refresh pending orders from backend
         await fetchPendingOrders();
       } else {
-        console.log('=== ORDERS FAILED ===');
-        console.log('Failed responses:', failedResponses);
         toast.error(`Failed to create ${failedResponses.length} order(s)`);
       }
     } catch (error) {
-      console.error('Error creating pending orders:', error);
       toast.error('Network error while creating pending orders');
     }
   };
@@ -1001,9 +928,6 @@ function App() {
       updateData.partNumbers = modelArray;
     }
 
-    console.log('Updating turbo data:', updateData); // Debug log
-    console.log('Editing turbo priority:', editingTurbo.priority);
-    console.log('New form priority:', newTurboForm.priority);
     await updateTurbo(editingTurbo.id, updateData);
     setShowEditModal(false);
     setEditingTurbo(null);
@@ -1043,12 +967,7 @@ function App() {
   const handleLowStockClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('Low stock card clicked!');
-    console.log('Event target:', e.target);
-    console.log('Current target:', e.currentTarget);
-    console.log('Current showLowStockModal:', showLowStockModal);
     setShowLowStockModal(true);
-    console.log('Setting showLowStockModal to true');
   };
 
   const handleLowStockClose = () => {
@@ -1065,8 +984,6 @@ function App() {
 
   const handleOrderArrived = async (order: PendingOrder) => {
     try {
-      console.log('Marking order as arrived:', order);
-      
       // Extract the first part number for multiple models (e.g., "1234, 5674" -> "1234")
       const partNumberToUpdate = order.partNumber.split(',')[0].trim();
       
@@ -1082,12 +999,9 @@ function App() {
           operation: 'add' // Add the ordered quantity to existing stock
         })
       });
-
-      console.log('Turbo update response status:', turboResponse.status);
       
       if (turboResponse.ok) {
         const turboResult = await turboResponse.json();
-        console.log('Turbo update success result:', turboResult);
         
         // Now mark the pending order as arrived in the backend
         const orderResponse = await fetch(`${API_BASE_URL}/${order.id}/arrived`, {
@@ -1096,12 +1010,9 @@ function App() {
             'Content-Type': 'application/json',
           }
         });
-
-        console.log('Order status update response status:', orderResponse.status);
         
         if (orderResponse.ok) {
           const orderResult = await orderResponse.json();
-          console.log('Order status update success result:', orderResult);
           
           // Refresh pending orders from backend
           await fetchPendingOrders();
@@ -1114,16 +1025,13 @@ function App() {
           toast.success(`Order for ${order.model} marked as arrived! Quantity added to stock.`);
         } else {
           const error = await orderResponse.json();
-          console.log('Order status update error response:', error);
           toast.error(error.error || 'Failed to update order status');
         }
       } else {
         const error = await turboResponse.json();
-        console.log('Turbo update error response:', error);
         toast.error(error.error || 'Failed to update turbo quantity');
       }
     } catch (error) {
-      console.error('Error marking order as arrived:', error);
       toast.error('Network error while updating order status');
     }
   };
@@ -1146,27 +1054,20 @@ function App() {
     // Ask for confirmation
     if (window.confirm(`Do you really want to sell ${sellQuantity} turbo(s) of ${sellingTurbo.model}?`)) {
       try {
-        console.log('Selling turbo:', sellingTurbo.id, 'Quantity:', sellQuantity);
-        console.log('API URL:', `${API_BASE_URL}/turbos/sell`);
-        
-        // Call the new sell API endpoint
-        const response = await fetch(`${API_BASE_URL}/turbos/sell`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-                  body: JSON.stringify({
+              // Call the new sell API endpoint
+      const response = await fetch(`${API_BASE_URL}/turbos/sell`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+                body: JSON.stringify({
           partNumber: sellingTurbo.id.split(',')[0].trim(), // Use first part number for selling
           quantity: sellQuantity
         })
-        });
-
-        console.log('Response status:', response.status);
-        console.log('Response URL:', response.url);
-        
-        if (response.ok) {
-          const result = await response.json();
-          console.log('Success result:', result);
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
           toast.success(result.message || `Successfully sold ${sellQuantity} turbo(s)!`);
           setShowSellModal(false);
           setSellingTurbo(null);
@@ -1177,7 +1078,6 @@ function App() {
           }, 500);
         } else {
           const error = await response.json();
-          console.log('Error response:', error);
           if (error.error === 'Not enough quantity to sell') {
             toast.error(`Not enough quantity to sell. Available: ${error.available}, Requested: ${error.requested}`);
           } else {
@@ -1185,7 +1085,6 @@ function App() {
           }
         }
       } catch (error) {
-        console.error('Error selling turbo:', error);
         toast.error('Network error while selling turbo');
       }
     }
@@ -1306,21 +1205,16 @@ function App() {
             placeholder="Search turbos by ID, model, or bay..."
             value={searchTerm}
             onChange={(e) => {
-              console.log('Search onChange triggered:', e.target.value);
               setSearchTerm(e.target.value);
             }}
             onKeyDown={(e) => {
-              console.log('Search key pressed:', e.key);
               if (e.key === 'Enter') {
                 e.preventDefault();
-                console.log('Enter pressed in search - preventing default');
               }
             }}
             onFocus={(e) => {
-              console.log('Search input focused');
             }}
             onBlur={(e) => {
-              console.log('Search input blurred');
             }}
             className="search-input"
           />
