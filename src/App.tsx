@@ -538,11 +538,50 @@ function App() {
   // Get low stock items for order modal
   const lowStockItems = Array.isArray(turboItems) ? turboItems.filter(item => item.isLowStock) : [];
 
-  const filteredItems = Array.isArray(turboItems) ? turboItems.filter(item =>
-    (item.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.model || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.bay || item.location || '').toLowerCase().includes(searchTerm.toLowerCase())
-  ) : [];
+  // Enhanced search functionality
+  const filteredItems = Array.isArray(turboItems) ? turboItems.filter(item => {
+    if (!searchTerm.trim()) return true;
+    
+    const searchLower = searchTerm.toLowerCase().trim();
+    
+    // Search in multiple fields with flexible matching
+    const searchableFields = [
+      // Part numbers (ID) - search for partial matches
+      ...(item.allPartNumbers || []),
+      ...(item.bigPartNumbers || []),
+      ...(item.smallPartNumbers || []),
+      item.id || '',
+      // Model name
+      item.model || '',
+      // Location/Bay - search for partial matches
+      item.location || item.bay || '',
+      // Individual part numbers from comma-separated strings
+      ...(item.id ? item.id.split(',').map(p => p.trim()) : []),
+      ...(item.model ? item.model.split(',').map(p => p.trim()) : [])
+    ];
+    
+    // Check if any field contains the search term
+    return searchableFields.some(field => {
+      if (!field) return false;
+      const fieldLower = field.toLowerCase();
+      
+      // Exact match
+      if (fieldLower === searchLower) return true;
+      
+      // Contains match
+      if (fieldLower.includes(searchLower)) return true;
+      
+      // Partial match for numbers (e.g., "12" matches "123456")
+      if (/^\d+$/.test(searchLower) && /^\d+$/.test(fieldLower)) {
+        return fieldLower.includes(searchLower);
+      }
+      
+      // Word boundary match (e.g., "bay" matches "BAY 1.1")
+      const words = fieldLower.split(/[\s\-_.,]+/);
+      return words.some(word => word.includes(searchLower));
+      
+    });
+  }) : [];
 
   const totalItems = turboStats.totalItems;
   const lowStockItemsCount = turboStats.lowStockItems;
@@ -638,12 +677,12 @@ function App() {
       }
       
       // Check quantities for entered models
-      if (newTurboForm.bigModels.trim() && (!newTurboForm.bigQuantity || parseInt(newTurboForm.bigQuantity) <= 0)) {
+      if (newTurboForm.bigModels.trim() && (!newTurboForm.bigQuantity || parseInt(newTurboForm.bigQuantity) < 0)) {
         toast.error('Please enter a valid big quantity');
         return;
       }
       
-      if (newTurboForm.smallModels.trim() && (!newTurboForm.smallQuantity || parseInt(newTurboForm.smallQuantity) <= 0)) {
+      if (newTurboForm.smallModels.trim() && (!newTurboForm.smallQuantity || parseInt(newTurboForm.smallQuantity) < 0)) {
         toast.error('Please enter a valid small quantity');
         return;
       }
@@ -655,7 +694,7 @@ function App() {
       }
       
       // Check if quantity is filled
-      if (!newTurboForm.quantity || parseInt(newTurboForm.quantity) <= 0) {
+      if (!newTurboForm.quantity || parseInt(newTurboForm.quantity) < 0) {
         toast.error('Please enter a valid quantity');
         return;
       }
@@ -895,12 +934,12 @@ function App() {
       }
       
       // Check quantities for entered models
-      if (newTurboForm.bigModels.trim() && (!newTurboForm.bigQuantity || parseInt(newTurboForm.bigQuantity) <= 0)) {
+      if (newTurboForm.bigModels.trim() && (!newTurboForm.bigQuantity || parseInt(newTurboForm.bigQuantity) < 0)) {
         toast.error('Please enter a valid big quantity');
         return;
       }
       
-      if (newTurboForm.smallModels.trim() && (!newTurboForm.smallQuantity || parseInt(newTurboForm.smallQuantity) <= 0)) {
+      if (newTurboForm.smallModels.trim() && (!newTurboForm.smallQuantity || parseInt(newTurboForm.smallQuantity) < 0)) {
         toast.error('Please enter a valid small quantity');
         return;
       }
@@ -912,7 +951,7 @@ function App() {
       }
       
       // Check if quantity is filled
-      if (!newTurboForm.quantity || parseInt(newTurboForm.quantity) <= 0) {
+      if (!newTurboForm.quantity || parseInt(newTurboForm.quantity) < 0) {
         toast.error('Please enter a valid quantity');
         return;
       }
@@ -1232,7 +1271,7 @@ function App() {
         <div className="search-container">
           <input
             type="text"
-            placeholder="Search turbos by ID, model, or bay..."
+            placeholder="Search by part number, model, bay location, or any text..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
