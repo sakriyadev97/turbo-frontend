@@ -538,29 +538,29 @@ function App() {
   // Get low stock items for order modal
   const lowStockItems = Array.isArray(turboItems) ? turboItems.filter(item => item.isLowStock) : [];
 
-  // Enhanced search functionality
+  // Enhanced search functionality - starts with matching
   const filteredItems = Array.isArray(turboItems) ? turboItems.filter(item => {
     if (!searchTerm.trim()) return true;
     
     const searchLower = searchTerm.toLowerCase().trim();
     
-    // Search in multiple fields with flexible matching
+    // Search in multiple fields with "starts with" matching
     const searchableFields = [
-      // Part numbers (ID) - search for partial matches
+      // Part numbers (ID) - search for starts with matches
       ...(item.allPartNumbers || []),
       ...(item.bigPartNumbers || []),
       ...(item.smallPartNumbers || []),
       item.id || '',
       // Model name
       item.model || '',
-      // Location/Bay - search for partial matches
+      // Location/Bay - search for starts with matches
       item.location || item.bay || '',
       // Individual part numbers from comma-separated strings
       ...(item.id ? item.id.split(',').map(p => p.trim()) : []),
       ...(item.model ? item.model.split(',').map(p => p.trim()) : [])
     ];
     
-    // Check if any field contains the search term
+    // Check if any field starts with the search term
     return searchableFields.some(field => {
       if (!field) return false;
       const fieldLower = field.toLowerCase();
@@ -568,18 +568,16 @@ function App() {
       // Exact match
       if (fieldLower === searchLower) return true;
       
-      // Contains match
-      if (fieldLower.includes(searchLower)) return true;
+      // Starts with match (e.g., "721" matches "721078", "721505", etc.)
+      if (fieldLower.startsWith(searchLower)) return true;
       
-      // Partial match for numbers (e.g., "12" matches "123456")
-      if (/^\d+$/.test(searchLower) && /^\d+$/.test(fieldLower)) {
-        return fieldLower.includes(searchLower);
+      // For location fields, also check if bay number starts with search
+      if (fieldLower.includes('bay') && /^\d+$/.test(searchLower)) {
+        const bayMatch = fieldLower.match(/bay\s*(\d+)/i);
+        if (bayMatch && bayMatch[1].startsWith(searchLower)) return true;
       }
       
-      // Word boundary match (e.g., "bay" matches "BAY 1.1")
-      const words = fieldLower.split(/[\s\-_.,]+/);
-      return words.some(word => word.includes(searchLower));
-      
+      return false;
     });
   }) : [];
 
@@ -1271,7 +1269,7 @@ function App() {
         <div className="search-container">
           <input
             type="text"
-            placeholder="Search by part number, model, bay location, or any text..."
+            placeholder="Search by part number (starts with), model, or bay number..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
