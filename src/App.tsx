@@ -246,9 +246,19 @@ function App() {
             }
             
             if (displayText) {
+              // Create a more descriptive model text that includes quantities
+              let modelWithQuantities = '';
+              if (bigPartNumbers.length > 0) {
+                modelWithQuantities += `Big: ${bigPartNumbers.join(', ')} (Qty: ${bigQuantity})`;
+              }
+              if (smallPartNumbers.length > 0) {
+                if (modelWithQuantities) modelWithQuantities += ' | ';
+                modelWithQuantities += `Small: ${smallPartNumbers.join(', ')} (Qty: ${smallQuantity})`;
+              }
+              
               return [{
                 id: displayText, // Use display text as ID for uniqueness
-                model: displayText,
+                model: modelWithQuantities,
                 location: turbo.location || 'No location',
                 bay: turbo.location || 'No location',
                 quantity: totalQuantity,
@@ -431,8 +441,28 @@ function App() {
 
   const deleteTurbo = async (id: string) => {
     try {
-      // If the id contains multiple part numbers (comma-separated), use the first one for deletion
-      const partNumberToDelete = id.split(',')[0].trim();
+      // For Big/Small variants, the id contains the display text like "Big: 99999, 99909 | Small: 22222, 121212"
+      // We need to extract the first part number from either Big or Small variants
+      let partNumberToDelete = '';
+      
+      if (id.includes('Big:') || id.includes('Small:')) {
+        // This is a Big/Small variant, extract the first part number
+        const bigMatch = id.match(/Big:\s*([^|]+)/);
+        const smallMatch = id.match(/Small:\s*([^|]+)/);
+        
+        if (bigMatch) {
+          // Extract first part number from Big variants
+          const bigPartNumbers = bigMatch[1].split(',').map(pn => pn.trim());
+          partNumberToDelete = bigPartNumbers[0];
+        } else if (smallMatch) {
+          // Extract first part number from Small variants
+          const smallPartNumbers = smallMatch[1].split(',').map(pn => pn.trim());
+          partNumberToDelete = smallPartNumbers[0];
+        }
+      } else {
+        // Regular turbo, use the first part number
+        partNumberToDelete = id.split(',')[0].trim();
+      }
       
       const response = await fetch(`${API_BASE_URL}/turbos/delete-by-partnumber/${partNumberToDelete}`, {
         method: 'DELETE'
@@ -1061,7 +1091,7 @@ function App() {
           'Content-Type': 'application/json',
         },
                 body: JSON.stringify({
-          partNumber: sellingTurbo.id.split(',')[0].trim(), // Use first part number for selling
+          partNumber: sellingTurbo.bigPartNumbers?.[0] || sellingTurbo.smallPartNumbers?.[0] || sellingTurbo.id.split(',')[0].trim(), // Use first part number for selling
           quantity: sellQuantity
         })
       });
