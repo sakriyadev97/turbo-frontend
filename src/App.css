@@ -2667,3 +2667,35 @@ body {
     gap: 8px;
   }
 }
+
+/* Modal-specific bulk selection controls */
+.bulk-selection-controls-modal {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 12px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.order-item-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.item-selection {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+}
+
+.bulk-order-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+}
+
+.bulk-order-btn:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+}

@@ -90,7 +90,6 @@ function App() {
   // State for bulk selection
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [bulkOrderQuantities, setBulkOrderQuantities] = useState<{[key: string]: number}>({});
-  const [showBulkOrderModal, setShowBulkOrderModal] = useState(false);
   const [bulkMultipleModels, setBulkMultipleModels] = useState('');
   const [bulkMultipleQuantity, setBulkMultipleQuantity] = useState(1);
   const [bulkLocation, setBulkLocation] = useState('');
@@ -768,6 +767,14 @@ function App() {
   const handleOrderCancel = () => {
     setShowOrderModal(false);
     setOrderQuantities({});
+    // Clear bulk selections
+    setSelectedItems(new Set());
+    setBulkOrderQuantities({});
+    setBulkMultipleModels('');
+    setBulkMultipleQuantity(1);
+    setBulkLocation('');
+    // Clean up temporary bulk items
+    setTurboItems(prev => prev.filter(item => !item.id.startsWith('BULK_')));
   };
 
   // Bulk selection handlers
@@ -809,12 +816,7 @@ function App() {
     }));
   };
 
-  const handleBulkOrderCancel = () => {
-    setShowBulkOrderModal(false);
-    setBulkMultipleModels('');
-    setBulkMultipleQuantity(1);
-    setBulkLocation('');
-  };
+
 
   // Create a pending order
   const createPendingOrder = async (orderData: { partNumber: string; model: string; location: string; quantity: number }) => {
@@ -1554,22 +1556,7 @@ function App() {
           />
           <span className="search-icon">🔍</span>
         </div>
-        <div className="bulk-selection-controls">
-          <button 
-            className="bulk-select-btn"
-            onClick={handleSelectAll}
-          >
-            {selectedItems.size === filteredItems.length && filteredItems.length > 0 ? 
-              '☑️ Deselect All' : 
-              '☐ Select All'
-            }
-          </button>
-          {selectedItems.size > 0 && (
-            <span className="selection-count">
-              {selectedItems.size} selected
-            </span>
-          )}
-        </div>
+
         <div className="action-buttons">
           <button className="btn btn-purple" onClick={() => setShowModal(true)}>
             <span className="btn-icon">+</span>
@@ -1578,14 +1565,6 @@ function App() {
           <button className="btn btn-orange" onClick={() => setShowOrderModal(true)}>
             <span className="btn-icon">📦</span>
             Order Now
-          </button>
-          <button 
-            className="btn btn-green" 
-            onClick={() => setShowBulkOrderModal(true)}
-            disabled={selectedItems.size === 0}
-          >
-            <span className="btn-icon">☑️</span>
-            Bulk Order ({selectedItems.size})
           </button>
           <button className="btn btn-blue" onClick={handlePendingClick}>
             <span className="btn-icon">⏳</span>
@@ -1619,15 +1598,7 @@ function App() {
       <div className="turbo-grid">
         {filteredItems.map((item) => (
           <div key={item.id || 'unknown'} className="turbo-card">
-            <div className="turbo-card-header">
-              <input
-                type="checkbox"
-                className="bulk-select-checkbox"
-                checked={selectedItems.has(item.id)}
-                onChange={() => handleItemSelect(item.id)}
-              />
-              <div className="turbo-id">#{item.id || 'Unknown'}</div>
-            </div>
+            <div className="turbo-id">#{item.id || 'Unknown'}</div>
             <div className="turbo-model">{item.model || 'Unknown Model'}</div>
             <div className="turbo-location">
               <span className="location-icon">📍</span>
@@ -2049,12 +2020,84 @@ function App() {
             
             <div className="modal-form">
               <div className="instructions-box">
-                <strong>Instructions:</strong> Use +/- buttons to select quantities to order for low stock items. Click 'Generate Order' on individual items or use the main button for all selected items.
+                <strong>Individual Orders:</strong> Use +/- buttons to select quantities and click 'Generate Order' for individual items.<br/>
+                <strong>Bulk Orders:</strong> Check multiple items and use 'Create Bulk Order' for consolidated PDF invoice.
+              </div>
+
+              {/* Add Multiple Models Section */}
+              <div className="add-multiple-models-section">
+                <h3>Add Multiple Models to Order</h3>
+                <div className="multiple-models-form">
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Model Numbers (comma-separated):</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., 5314 970 7013, 5435 970 0028, 1234 567 8901"
+                        value={bulkMultipleModels}
+                        onChange={(e) => setBulkMultipleModels(e.target.value)}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Location:</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., BAY 2.1"
+                        value={bulkLocation}
+                        onChange={(e) => setBulkLocation(e.target.value)}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Quantity:</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={bulkMultipleQuantity}
+                        onChange={(e) => setBulkMultipleQuantity(parseInt(e.target.value) || 1)}
+                        className="form-input quantity-input"
+                      />
+                    </div>
+                    <button 
+                      type="button"
+                      className="add-models-btn"
+                      onClick={handleAddMultipleModels}
+                    >
+                      Add Models
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bulk-selection-controls-modal">
+                <button 
+                  className="bulk-select-btn"
+                  onClick={handleSelectAll}
+                >
+                  {selectedItems.size === filteredItems.length && filteredItems.length > 0 ? 
+                    '☑️ Deselect All' : 
+                    '☐ Select All'
+                  }
+                </button>
+                {selectedItems.size > 0 && (
+                  <span className="selection-count">
+                    {selectedItems.size} selected for bulk order
+                  </span>
+                )}
               </div>
               
               <div className="order-items-list">
                 {lowStockItems.map((item) => (
                   <div key={item.id} className="order-item-card low-stock-item">
+                    <div className="item-selection">
+                      <input
+                        type="checkbox"
+                        className="bulk-select-checkbox"
+                        checked={selectedItems.has(item.id)}
+                        onChange={() => handleItemSelect(item.id)}
+                      />
+                    </div>
                     <div className="item-details">
                       <div className="item-id">{item.id}</div>
                       <div className="item-info">
@@ -2118,6 +2161,14 @@ function App() {
                 <button className="modal-btn cancel-btn" onClick={handleOrderCancel}>
                   Cancel
                 </button>
+                {selectedItems.size > 0 && (
+                  <button 
+                    className="modal-btn save-btn bulk-order-btn" 
+                    onClick={handleBulkOrderConfirm}
+                  >
+                    Create Bulk Order ({selectedItems.size} items)
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -2296,126 +2347,7 @@ function App() {
         </div>
       )}
 
-      {/* Bulk Order Modal Overlay */}
-      {showBulkOrderModal && (
-        <div className="modal-overlay" onClick={handleBulkOrderCancel}>
-          <div className="modal bulk-order-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="bulk-order-icon">📦</div>
-              <h2 className="modal-title">Bulk Order Creation</h2>
-            </div>
-            
-            <div className="modal-form">
-              <div className="instructions-box">
-                <strong>Selected Items ({selectedItems.size}):</strong> Review quantities and create orders for multiple items at once.
-              </div>
 
-              {/* Add Multiple Models Section */}
-              <div className="add-multiple-models-section">
-                <h3>Add Multiple Models</h3>
-                <div className="multiple-models-form">
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Model Numbers (comma-separated):</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., 5314 970 7013, 5435 970 0028, 1234 567 8901"
-                        value={bulkMultipleModels}
-                        onChange={(e) => setBulkMultipleModels(e.target.value)}
-                        className="form-input"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Location:</label>
-                      <input
-                        type="text"
-                        placeholder="e.g., BAY 2.1"
-                        value={bulkLocation}
-                        onChange={(e) => setBulkLocation(e.target.value)}
-                        className="form-input"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Quantity:</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={bulkMultipleQuantity}
-                        onChange={(e) => setBulkMultipleQuantity(parseInt(e.target.value) || 1)}
-                        className="form-input quantity-input"
-                      />
-                    </div>
-                    <button 
-                      type="button"
-                      className="add-models-btn"
-                      onClick={handleAddMultipleModels}
-                    >
-                      Add Models
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bulk-order-items">
-                {Array.from(selectedItems).map(itemId => {
-                  const item = turboItems.find(t => t.id === itemId);
-                  if (!item) return null;
-                  
-                  return (
-                    <div key={itemId} className="bulk-order-item">
-                      <div className="bulk-item-info">
-                        <div className="bulk-item-id">#{item.id}</div>
-                        <div className="bulk-item-model">{item.model}</div>
-                        <div className="bulk-item-location">{item.location || item.bay}</div>
-                        <div className="bulk-item-stock">
-                          {itemId.startsWith('BULK_') ? 'Multiple Models' : `Stock: ${item.quantity}`}
-                        </div>
-                      </div>
-                      <div className="bulk-item-actions">
-                        <div className="bulk-quantity-controls">
-                          <button 
-                            className="quantity-btn minus-btn"
-                            onClick={() => handleBulkQuantityChange(itemId, (bulkOrderQuantities[itemId] || 1) - 1)}
-                          >
-                            -
-                          </button>
-                          <span className="quantity-display">{bulkOrderQuantities[itemId] || 1}</span>
-                          <button 
-                            className="quantity-btn plus-btn"
-                            onClick={() => handleBulkQuantityChange(itemId, (bulkOrderQuantities[itemId] || 1) + 1)}
-                          >
-                            +
-                          </button>
-                        </div>
-                        <button 
-                          className="remove-bulk-item-btn"
-                          onClick={() => handleRemoveBulkItem(itemId)}
-                          title="Remove from bulk order"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            
-            <div className="modal-actions">
-              <button className="modal-btn cancel-btn" onClick={handleBulkOrderCancel}>
-                Cancel
-              </button>
-              <button 
-                className="modal-btn save-btn" 
-                onClick={handleBulkOrderConfirm}
-                disabled={selectedItems.size === 0}
-              >
-                Create {selectedItems.size} Order(s)
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       <ToastContainer />
     </div>
   );
