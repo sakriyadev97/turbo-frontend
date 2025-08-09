@@ -816,6 +816,23 @@ function App() {
     setBulkLocation('');
   };
 
+  // Create a pending order
+  const createPendingOrder = async (orderData: { partNumber: string; model: string; location: string; quantity: number }) => {
+    const response = await fetch(`${API_BASE_URL}/create-order`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(orderData)
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to create pending order');
+    }
+
+    return await response.json();
+  };
+
   const handleAddMultipleModels = () => {
     if (!bulkMultipleModels.trim()) {
       toast.error('Please enter model numbers');
