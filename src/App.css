@@ -2482,6 +2482,33 @@ body {
   background: #fafafa;
 }
 
+.bulk-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.remove-bulk-item-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: #ef4444;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.remove-bulk-item-btn:hover {
+  background: #dc2626;
+  transform: scale(1.05);
+}
+
 .bulk-order-item:last-child {
   border-bottom: none;
 }
@@ -2555,4 +2582,88 @@ body {
 .bulk-order-icon {
   font-size: 2rem;
   margin-bottom: 8px;
+}
+
+/* Add Multiple Models Section */
+.add-multiple-models-section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.add-multiple-models-section h3 {
+  margin: 0 0 12px 0;
+  color: #374151;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.multiple-models-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 100px auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.form-input {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.quantity-input {
+  text-align: center;
+}
+
+.add-models-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.add-models-btn:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
 }

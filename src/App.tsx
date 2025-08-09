@@ -91,6 +91,9 @@ function App() {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [bulkOrderQuantities, setBulkOrderQuantities] = useState<{[key: string]: number}>({});
   const [showBulkOrderModal, setShowBulkOrderModal] = useState(false);
+  const [bulkMultipleModels, setBulkMultipleModels] = useState('');
+  const [bulkMultipleQuantity, setBulkMultipleQuantity] = useState(1);
+  const [bulkLocation, setBulkLocation] = useState('');
 
   // API Base URL - Use deployed backend or fallback to localhost
   const API_BASE_URL =  'https://turbo-backend-henna.vercel.app/api';
@@ -808,13 +811,81 @@ function App() {
 
   const handleBulkOrderCancel = () => {
     setShowBulkOrderModal(false);
+    setBulkMultipleModels('');
+    setBulkMultipleQuantity(1);
+    setBulkLocation('');
+  };
+
+  const handleAddMultipleModels = () => {
+    if (!bulkMultipleModels.trim()) {
+      toast.error('Please enter model numbers');
+      return;
+    }
+    if (!bulkLocation.trim()) {
+      toast.error('Please enter location');
+      return;
+    }
+
+    // Parse comma-separated model numbers
+    const modelNumbers = bulkMultipleModels
+      .split(',')
+      .map(model => model.trim())
+      .filter(model => model.length > 0);
+
+    if (modelNumbers.length === 0) {
+      toast.error('Please enter valid model numbers');
+      return;
+    }
+
+    // Create a synthetic item ID for these multiple models
+    const multiModelId = `BULK_${Date.now()}_${modelNumbers.join(',').replace(/\s/g, '')}`;
+    const displayModel = modelNumbers.join(', ');
+
+    // Add to selected items
+    const newSelected = new Set(selectedItems);
+    newSelected.add(multiModelId);
+    setSelectedItems(newSelected);
+
+    // Set quantity for this bulk item
+    setBulkOrderQuantities(prev => ({
+      ...prev,
+      [multiModelId]: bulkMultipleQuantity
+    }));
+
+    // Create a temporary turbo item for display in the bulk order
+    const tempTurboItem = {
+      id: multiModelId,
+      model: displayModel,
+      location: bulkLocation,
+      bay: bulkLocation,
+      quantity: 0, // Unknown stock for manually added items
+      isLowStock: false,
+      priority: false,
+      allPartNumbers: modelNumbers,
+      bigPartNumbers: [],
+      smallPartNumbers: [],
+      bigQuantity: 0,
+      smallQuantity: 0
+    };
+
+    // Add to turboItems temporarily for display purposes
+    setTurboItems(prev => [...prev, tempTurboItem]);
+
+    // Clear form
+    setBulkMultipleModels('');
+    setBulkMultipleQuantity(1);
+    setBulkLocation('');
+
+    toast.success(`Added ${modelNumbers.length} models to bulk order`);
   };
 
   const handleBulkOrderConfirm = async () => {
     const selectedItemsArray = Array.from(selectedItems);
     let successCount = 0;
     let failCount = 0;
+    const allOrdersForEmail: any[] = [];
 
+    // First, create all pending orders and collect them for bulk email
     for (const itemId of selectedItemsArray) {
       const quantity = bulkOrderQuantities[itemId] || 0;
       if (quantity <= 0) continue;
@@ -823,49 +894,122 @@ function App() {
       if (!item) continue;
 
       try {
-        // Extract first part number for backend API
-        const firstPartNumber = item.allPartNumbers?.[0] || 
-                               item.bigPartNumbers?.[0] || 
-                               item.smallPartNumbers?.[0] || 
-                               item.id.split(',')[0].trim();
+        // Check if this is a bulk multiple models item
+        if (itemId.startsWith('BULK_')) {
+          // Handle multiple models - create separate orders for each model
+          const modelNumbers = item.allPartNumbers || [];
+          
+          for (const partNumber of modelNumbers) {
+            await createPendingOrder({
+              partNumber: partNumber.trim(),
+              model: partNumber.trim(),
+              location: item.location || item.bay || '',
+              quantity: quantity
+            });
 
-        await createPendingOrder({
-          partNumber: firstPartNumber,
-          model: item.model,
-          location: item.location || item.bay || '',
-          quantity: quantity
-        });
+            // Add to bulk email collection
+            allOrdersForEmail.push({
+              partNumber: partNumber.trim(),
+              model: partNumber.trim(),
+              location: item.location || item.bay || '',
+              quantity: quantity
+            });
+            
+            successCount++;
+          }
+        } else {
+          // Handle regular single items
+          const firstPartNumber = item.allPartNumbers?.[0] || 
+                                 item.bigPartNumbers?.[0] || 
+                                 item.smallPartNumbers?.[0] || 
+                                 item.id.split(',')[0].trim();
 
-        // Send email for this order
-        await sendOrderEmail(
-          `Order Created - ${item.model}`,
-          `Order has been created for:\n\nPart Number: ${firstPartNumber}\nModel: ${item.model}\nLocation: ${item.location || item.bay}\nQuantity: ${quantity}`,
-          {
+          await createPendingOrder({
             partNumber: firstPartNumber,
             model: item.model,
             location: item.location || item.bay || '',
             quantity: quantity
-          }
-        );
+          });
 
-        successCount++;
+          // Add to bulk email collection
+          allOrdersForEmail.push({
+            partNumber: firstPartNumber,
+            model: item.model,
+            location: item.location || item.bay || '',
+            quantity: quantity
+          });
+
+          successCount++;
+        }
       } catch (error) {
         failCount++;
       }
     }
 
-    if (successCount > 0) {
-      toast.success(`Successfully created ${successCount} bulk orders!`);
+    // Send single bulk email with PDF if we have successful orders
+    if (successCount > 0 && allOrdersForEmail.length > 0) {
+      try {
+        const orderNumber = `BO-${Date.now()}`;
+        await sendBulkOrderEmailWithPDF(allOrdersForEmail, orderNumber);
+        toast.success(`Successfully created ${successCount} bulk orders and sent consolidated PDF invoice!`);
+      } catch (emailError) {
+        toast.warning(`Orders created successfully, but failed to send bulk email: ${emailError}`);
+      }
       await fetchPendingOrders();
     }
+    
     if (failCount > 0) {
       toast.error(`Failed to create ${failCount} orders`);
     }
 
+    // Clean up temporary bulk items
+    setTurboItems(prev => prev.filter(item => !item.id.startsWith('BULK_')));
+    
     // Clear selections
     setSelectedItems(new Set());
     setBulkOrderQuantities({});
     setShowBulkOrderModal(false);
+  };
+
+  const sendBulkOrderEmailWithPDF = async (orders: any[], orderNumber: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/email/send-bulk-order-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orders: orders,
+          orderNumber: orderNumber
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send bulk order email');
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const handleRemoveBulkItem = (itemId: string) => {
+    // Remove from selected items
+    const newSelected = new Set(selectedItems);
+    newSelected.delete(itemId);
+    setSelectedItems(newSelected);
+
+    // Remove from quantities
+    const newQuantities = { ...bulkOrderQuantities };
+    delete newQuantities[itemId];
+    setBulkOrderQuantities(newQuantities);
+
+    // Remove from turboItems if it's a bulk item
+    if (itemId.startsWith('BULK_')) {
+      setTurboItems(prev => prev.filter(item => item.id !== itemId));
+    }
   };
 
   const handleIndividualGenerateOrder = async (item: TurboItem) => {
@@ -2149,6 +2293,52 @@ function App() {
                 <strong>Selected Items ({selectedItems.size}):</strong> Review quantities and create orders for multiple items at once.
               </div>
 
+              {/* Add Multiple Models Section */}
+              <div className="add-multiple-models-section">
+                <h3>Add Multiple Models</h3>
+                <div className="multiple-models-form">
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Model Numbers (comma-separated):</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., 5314 970 7013, 5435 970 0028, 1234 567 8901"
+                        value={bulkMultipleModels}
+                        onChange={(e) => setBulkMultipleModels(e.target.value)}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Location:</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., BAY 2.1"
+                        value={bulkLocation}
+                        onChange={(e) => setBulkLocation(e.target.value)}
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Quantity:</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={bulkMultipleQuantity}
+                        onChange={(e) => setBulkMultipleQuantity(parseInt(e.target.value) || 1)}
+                        className="form-input quantity-input"
+                      />
+                    </div>
+                    <button 
+                      type="button"
+                      className="add-models-btn"
+                      onClick={handleAddMultipleModels}
+                    >
+                      Add Models
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div className="bulk-order-items">
                 {Array.from(selectedItems).map(itemId => {
                   const item = turboItems.find(t => t.id === itemId);
@@ -2160,21 +2350,32 @@ function App() {
                         <div className="bulk-item-id">#{item.id}</div>
                         <div className="bulk-item-model">{item.model}</div>
                         <div className="bulk-item-location">{item.location || item.bay}</div>
-                        <div className="bulk-item-stock">Stock: {item.quantity}</div>
+                        <div className="bulk-item-stock">
+                          {itemId.startsWith('BULK_') ? 'Multiple Models' : `Stock: ${item.quantity}`}
+                        </div>
                       </div>
-                      <div className="bulk-quantity-controls">
+                      <div className="bulk-item-actions">
+                        <div className="bulk-quantity-controls">
+                          <button 
+                            className="quantity-btn minus-btn"
+                            onClick={() => handleBulkQuantityChange(itemId, (bulkOrderQuantities[itemId] || 1) - 1)}
+                          >
+                            -
+                          </button>
+                          <span className="quantity-display">{bulkOrderQuantities[itemId] || 1}</span>
+                          <button 
+                            className="quantity-btn plus-btn"
+                            onClick={() => handleBulkQuantityChange(itemId, (bulkOrderQuantities[itemId] || 1) + 1)}
+                          >
+                            +
+                          </button>
+                        </div>
                         <button 
-                          className="quantity-btn minus-btn"
-                          onClick={() => handleBulkQuantityChange(itemId, (bulkOrderQuantities[itemId] || 1) - 1)}
+                          className="remove-bulk-item-btn"
+                          onClick={() => handleRemoveBulkItem(itemId)}
+                          title="Remove from bulk order"
                         >
-                          -
-                        </button>
-                        <span className="quantity-display">{bulkOrderQuantities[itemId] || 1}</span>
-                        <button 
-                          className="quantity-btn plus-btn"
-                          onClick={() => handleBulkQuantityChange(itemId, (bulkOrderQuantities[itemId] || 1) + 1)}
-                        >
-                          +
+                          ✕
                         </button>
                       </div>
                     </div>
