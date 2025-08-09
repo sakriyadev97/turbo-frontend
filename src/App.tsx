@@ -987,7 +987,7 @@ function App() {
     // Clear selections
     setSelectedItems(new Set());
     setBulkOrderQuantities({});
-    setShowBulkOrderModal(false);
+    setShowOrderModal(false);
   };
 
   const sendBulkOrderEmailWithPDF = async (orders: any[], orderNumber: string) => {
