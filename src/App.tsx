@@ -86,6 +86,11 @@ function App() {
   
   // State for order quantities
   const [orderQuantities, setOrderQuantities] = useState<{[key: string]: number}>({});
+  
+  // State for bulk selection
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [bulkOrderQuantities, setBulkOrderQuantities] = useState<{[key: string]: number}>({});
+  const [showBulkOrderModal, setShowBulkOrderModal] = useState(false);
 
   // API Base URL - Use deployed backend or fallback to localhost
   const API_BASE_URL =  'https://turbo-backend-henna.vercel.app/api';
@@ -762,6 +767,107 @@ function App() {
     setOrderQuantities({});
   };
 
+  // Bulk selection handlers
+  const handleItemSelect = (itemId: string) => {
+    const newSelected = new Set(selectedItems);
+    if (newSelected.has(itemId)) {
+      newSelected.delete(itemId);
+      const newBulkQuantities = { ...bulkOrderQuantities };
+      delete newBulkQuantities[itemId];
+      setBulkOrderQuantities(newBulkQuantities);
+    } else {
+      newSelected.add(itemId);
+      setBulkOrderQuantities(prev => ({ ...prev, [itemId]: 1 }));
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedItems.size === filteredItems.length) {
+      // Deselect all
+      setSelectedItems(new Set());
+      setBulkOrderQuantities({});
+    } else {
+      // Select all
+      const allIds = new Set(filteredItems.map(item => item.id));
+      setSelectedItems(allIds);
+      const newQuantities: {[key: string]: number} = {};
+      filteredItems.forEach(item => {
+        newQuantities[item.id] = 1;
+      });
+      setBulkOrderQuantities(newQuantities);
+    }
+  };
+
+  const handleBulkQuantityChange = (itemId: string, quantity: number) => {
+    setBulkOrderQuantities(prev => ({
+      ...prev,
+      [itemId]: Math.max(0, quantity)
+    }));
+  };
+
+  const handleBulkOrderCancel = () => {
+    setShowBulkOrderModal(false);
+  };
+
+  const handleBulkOrderConfirm = async () => {
+    const selectedItemsArray = Array.from(selectedItems);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const itemId of selectedItemsArray) {
+      const quantity = bulkOrderQuantities[itemId] || 0;
+      if (quantity <= 0) continue;
+
+      const item = turboItems.find(t => t.id === itemId);
+      if (!item) continue;
+
+      try {
+        // Extract first part number for backend API
+        const firstPartNumber = item.allPartNumbers?.[0] || 
+                               item.bigPartNumbers?.[0] || 
+                               item.smallPartNumbers?.[0] || 
+                               item.id.split(',')[0].trim();
+
+        await createPendingOrder({
+          partNumber: firstPartNumber,
+          model: item.model,
+          location: item.location || item.bay || '',
+          quantity: quantity
+        });
+
+        // Send email for this order
+        await sendOrderEmail(
+          `Order Created - ${item.model}`,
+          `Order has been created for:\n\nPart Number: ${firstPartNumber}\nModel: ${item.model}\nLocation: ${item.location || item.bay}\nQuantity: ${quantity}`,
+          {
+            partNumber: firstPartNumber,
+            model: item.model,
+            location: item.location || item.bay || '',
+            quantity: quantity
+          }
+        );
+
+        successCount++;
+      } catch (error) {
+        failCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`Successfully created ${successCount} bulk orders!`);
+      await fetchPendingOrders();
+    }
+    if (failCount > 0) {
+      toast.error(`Failed to create ${failCount} orders`);
+    }
+
+    // Clear selections
+    setSelectedItems(new Set());
+    setBulkOrderQuantities({});
+    setShowBulkOrderModal(false);
+  };
+
   const handleIndividualGenerateOrder = async (item: TurboItem) => {
     const quantity = orderQuantities[item.id] || 0;
     if (quantity <= 0) {
@@ -1287,6 +1393,22 @@ function App() {
           />
           <span className="search-icon">🔍</span>
         </div>
+        <div className="bulk-selection-controls">
+          <button 
+            className="bulk-select-btn"
+            onClick={handleSelectAll}
+          >
+            {selectedItems.size === filteredItems.length && filteredItems.length > 0 ? 
+              '☑️ Deselect All' : 
+              '☐ Select All'
+            }
+          </button>
+          {selectedItems.size > 0 && (
+            <span className="selection-count">
+              {selectedItems.size} selected
+            </span>
+          )}
+        </div>
         <div className="action-buttons">
           <button className="btn btn-purple" onClick={() => setShowModal(true)}>
             <span className="btn-icon">+</span>
@@ -1295,6 +1417,14 @@ function App() {
           <button className="btn btn-orange" onClick={() => setShowOrderModal(true)}>
             <span className="btn-icon">📦</span>
             Order Now
+          </button>
+          <button 
+            className="btn btn-green" 
+            onClick={() => setShowBulkOrderModal(true)}
+            disabled={selectedItems.size === 0}
+          >
+            <span className="btn-icon">☑️</span>
+            Bulk Order ({selectedItems.size})
           </button>
           <button className="btn btn-blue" onClick={handlePendingClick}>
             <span className="btn-icon">⏳</span>
@@ -1328,7 +1458,15 @@ function App() {
       <div className="turbo-grid">
         {filteredItems.map((item) => (
           <div key={item.id || 'unknown'} className="turbo-card">
-            <div className="turbo-id">#{item.id || 'Unknown'}</div>
+            <div className="turbo-card-header">
+              <input
+                type="checkbox"
+                className="bulk-select-checkbox"
+                checked={selectedItems.has(item.id)}
+                onChange={() => handleItemSelect(item.id)}
+              />
+              <div className="turbo-id">#{item.id || 'Unknown'}</div>
+            </div>
             <div className="turbo-model">{item.model || 'Unknown Model'}</div>
             <div className="turbo-location">
               <span className="location-icon">📍</span>
@@ -1991,6 +2129,70 @@ function App() {
             <div className="modal-actions">
               <button className="modal-btn cancel-btn" onClick={handlePendingClose}>
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Order Modal Overlay */}
+      {showBulkOrderModal && (
+        <div className="modal-overlay" onClick={handleBulkOrderCancel}>
+          <div className="modal bulk-order-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="bulk-order-icon">📦</div>
+              <h2 className="modal-title">Bulk Order Creation</h2>
+            </div>
+            
+            <div className="modal-form">
+              <div className="instructions-box">
+                <strong>Selected Items ({selectedItems.size}):</strong> Review quantities and create orders for multiple items at once.
+              </div>
+
+              <div className="bulk-order-items">
+                {Array.from(selectedItems).map(itemId => {
+                  const item = turboItems.find(t => t.id === itemId);
+                  if (!item) return null;
+                  
+                  return (
+                    <div key={itemId} className="bulk-order-item">
+                      <div className="bulk-item-info">
+                        <div className="bulk-item-id">#{item.id}</div>
+                        <div className="bulk-item-model">{item.model}</div>
+                        <div className="bulk-item-location">{item.location || item.bay}</div>
+                        <div className="bulk-item-stock">Stock: {item.quantity}</div>
+                      </div>
+                      <div className="bulk-quantity-controls">
+                        <button 
+                          className="quantity-btn minus-btn"
+                          onClick={() => handleBulkQuantityChange(itemId, (bulkOrderQuantities[itemId] || 1) - 1)}
+                        >
+                          -
+                        </button>
+                        <span className="quantity-display">{bulkOrderQuantities[itemId] || 1}</span>
+                        <button 
+                          className="quantity-btn plus-btn"
+                          onClick={() => handleBulkQuantityChange(itemId, (bulkOrderQuantities[itemId] || 1) + 1)}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            
+            <div className="modal-actions">
+              <button className="modal-btn cancel-btn" onClick={handleBulkOrderCancel}>
+                Cancel
+              </button>
+              <button 
+                className="modal-btn save-btn" 
+                onClick={handleBulkOrderConfirm}
+                disabled={selectedItems.size === 0}
+              >
+                Create {selectedItems.size} Order(s)
               </button>
             </div>
           </div>
