@@ -6,6 +6,7 @@ import './App.css';
 interface TurboItem {
   id: string;
   model: string;
+  displayText?: string; // Display text for complex items
   bay?: string; // Optional for backward compatibility
   location?: string; // Backend might return this
   quantity: number;
@@ -261,8 +262,9 @@ function App() {
               }
               
               return [{
-                id: displayText, // Use display text as ID for uniqueness
+                id: [...bigPartNumbers, ...smallPartNumbers].join(', '), // Keep ID as just part numbers
                 model: modelWithQuantities,
+                displayText: displayText, // Add separate display text field
                 location: turbo.location || 'No location',
                 bay: turbo.location || 'No location',
                 quantity: totalQuantity,
@@ -287,13 +289,13 @@ function App() {
                 id: validPartNumbers.join(', '), // Join multiple part numbers with commas
                 model: validPartNumbers.join(', '), // Display all part numbers together
                 location: turbo.location || 'No location',
-                bay: turbo.location || 'No location', // For backward compatibility
-                quantity: turbo.quantity || 0,
-                isLowStock: isLowStockItem(turbo.quantity || 0, turbo.priority || false),
+                  bay: turbo.location || 'No location', // For backward compatibility
+                  quantity: turbo.quantity || 0,
+                  isLowStock: isLowStockItem(turbo.quantity || 0, turbo.priority || false),
                 priority: turbo.priority || false,
                 allPartNumbers: validPartNumbers // Keep original array for operations
               }];
-            }
+              }
             return [];
           }
         }).flat(); // Flatten the array of arrays
@@ -337,14 +339,14 @@ function App() {
         const transformedOrders: PendingOrder[] = (data.pendingOrders || [])
           .filter((order: any) => order.status !== 'arrived') // Only show pending orders
           .map((order: any) => ({
-            id: order._id,
-            partNumber: order.partNumber,
-            model: order.modelName, // Backend uses modelName
-            location: order.location,
-            quantity: order.quantity,
-            orderDate: new Date(order.orderDate).toISOString(),
-            status: order.status
-          }));
+          id: order._id,
+          partNumber: order.partNumber,
+          model: order.modelName, // Backend uses modelName
+          location: order.location,
+          quantity: order.quantity,
+          orderDate: new Date(order.orderDate).toISOString(),
+          status: order.status
+        }));
         
         setPendingOrders(transformedOrders);
       } else {
@@ -523,18 +525,18 @@ function App() {
         // Handle regular turbo
         const hasMultipleModels = !!(editingTurbo.allPartNumbers && editingTurbo.allPartNumbers.length > 1);
         
-        setNewTurboForm({
-          model: editingTurbo.model || '',
-          bay: editingTurbo.location || editingTurbo.bay || '',
-          quantity: editingTurbo.quantity?.toString() || '',
+      setNewTurboForm({
+        model: editingTurbo.model || '',
+        bay: editingTurbo.location || editingTurbo.bay || '',
+        quantity: editingTurbo.quantity?.toString() || '',
           multipleModels: hasMultipleModels,
-          bigSmallVariants: false,
+        bigSmallVariants: false,
           priority: !!editingTurbo.priority,
-          bigModels: '',
-          bigQuantity: '0',
-          smallModels: '',
-          smallQuantity: '0'
-        });
+        bigModels: '',
+        bigQuantity: '0',
+        smallModels: '',
+        smallQuantity: '0'
+      });
       }
     }
   }, [editingTurbo]);
@@ -548,6 +550,10 @@ function App() {
     
     const searchLower = searchTerm.toLowerCase().trim();
     
+    // Debug logging
+    console.log('Searching for:', searchLower);
+    console.log('Item being searched:', item);
+    
     // Search in multiple fields with "starts with" matching
     const searchableFields = [
       // Part numbers (ID) - search for starts with matches
@@ -557,6 +563,8 @@ function App() {
       item.id || '',
       // Model name
       item.model || '',
+      // Display text
+      item.displayText || '',
       // Location/Bay - search for starts with matches
       item.location || item.bay || '',
       // Individual part numbers from comma-separated strings
@@ -564,30 +572,56 @@ function App() {
       ...(item.model ? item.model.split(',').map(p => p.trim()) : [])
     ];
     
+    console.log('Searchable fields for this item:', searchableFields);
+    
     // Check if any field starts with the search term
-    return searchableFields.some(field => {
+    const matchFound = searchableFields.some(field => {
       if (!field) return false;
       const fieldLower = field.toLowerCase();
       
       // Exact match
-      if (fieldLower === searchLower) return true;
+      if (fieldLower === searchLower) {
+        console.log('Exact match found:', field);
+        return true;
+      }
       
       // Starts with match (e.g., "721" matches "721078", "721505", etc.)
-      if (fieldLower.startsWith(searchLower)) return true;
+      if (fieldLower.startsWith(searchLower)) {
+        console.log('Starts with match found:', field);
+        return true;
+      }
+      
+      // Contains match (for better search experience)
+      if (fieldLower.includes(searchLower)) {
+        console.log('Contains match found:', field);
+        return true;
+      }
       
       // For location fields, also check if bay number starts with search
       if (fieldLower.includes('bay') && /^\d+$/.test(searchLower)) {
         const bayMatch = fieldLower.match(/bay\s*(\d+)/i);
-        if (bayMatch && bayMatch[1].startsWith(searchLower)) return true;
+        if (bayMatch && bayMatch[1].startsWith(searchLower)) {
+          console.log('Bay number match found:', field);
+          return true;
+        }
       }
       
       return false;
     });
+    
+    console.log('Match found for item:', matchFound);
+    return matchFound;
   }) : [];
 
   const totalItems = turboStats.totalItems;
   const lowStockItemsCount = turboStats.lowStockItems;
   const totalQuantity = turboStats.totalQuantity;
+  
+  // Debug search results
+  console.log('Search term:', searchTerm);
+  console.log('Total items:', turboItems?.length || 0);
+  console.log('Filtered items:', filteredItems.length);
+  console.log('Filtered items:', filteredItems);
 
   const handleLoginInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -651,8 +685,8 @@ function App() {
     
     setNewTurboForm(prev => {
       const newState = {
-        ...prev,
-        [name]: type === 'checkbox' ? checked : value
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
       };
       return newState;
     });
@@ -692,13 +726,13 @@ function App() {
       // Regular form validation
       if (!newTurboForm.model.trim()) {
         toast.error('Please enter model name(s)');
-        return;
-      }
-      
-      // Check if quantity is filled
+      return;
+    }
+    
+    // Check if quantity is filled
       if (!newTurboForm.quantity || parseInt(newTurboForm.quantity) < 0) {
-        toast.error('Please enter a valid quantity');
-        return;
+      toast.error('Please enter a valid quantity');
+      return;
       }
     }
 
@@ -1115,7 +1149,7 @@ function App() {
 
   const handleEditSave = async () => {
     if (!editingTurbo) return;
-
+    
     // Check if bay/location is filled
     if (!newTurboForm.bay.trim()) {
       toast.error('Please enter bay location');
@@ -1144,13 +1178,13 @@ function App() {
       // Regular form validation
       if (!newTurboForm.model.trim()) {
         toast.error('Please enter model name(s)');
-        return;
-      }
-      
-      // Check if quantity is filled
+      return;
+    }
+    
+    // Check if quantity is filled
       if (!newTurboForm.quantity || parseInt(newTurboForm.quantity) < 0) {
-        toast.error('Please enter a valid quantity');
-        return;
+      toast.error('Please enter a valid quantity');
+      return;
       }
     }
 
@@ -1320,20 +1354,20 @@ function App() {
     // Ask for confirmation
     if (window.confirm(`Do you really want to sell ${sellQuantity} turbo(s) of ${sellingTurbo.model}?`)) {
       try {
-              // Call the new sell API endpoint
-      const response = await fetch(`${API_BASE_URL}/turbos/sell`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-                body: JSON.stringify({
+        // Call the new sell API endpoint
+        const response = await fetch(`${API_BASE_URL}/turbos/sell`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
           partNumber: sellingTurbo.bigPartNumbers?.[0] || sellingTurbo.smallPartNumbers?.[0] || sellingTurbo.id.split(',')[0].trim(), // Use first part number for selling
-          quantity: sellQuantity
-        })
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
+            quantity: sellQuantity
+          })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
           toast.success(result.message || `Successfully sold ${sellQuantity} turbo(s)!`);
           setShowSellModal(false);
           setSellingTurbo(null);
@@ -1485,6 +1519,15 @@ function App() {
             className="search-input"
           />
           <span className="search-icon">🔍</span>
+          {searchTerm && (
+            <button 
+              className="clear-search-btn" 
+              onClick={() => setSearchTerm('')}
+              style={{ marginLeft: '10px', padding: '5px 10px', background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            >
+              Clear
+            </button>
+          )}
         </div>
 
         <div className="action-buttons">
@@ -1524,12 +1567,19 @@ function App() {
         </div>
       </div>
 
+      {/* Search Results Info */}
+      {searchTerm && (
+        <div style={{ margin: '20px 0', padding: '10px', background: '#f0f0f0', borderRadius: '8px', textAlign: 'center' }}>
+          <strong>Search Results:</strong> Found {filteredItems.length} items matching "{searchTerm}"
+        </div>
+      )}
+
       {/* Turbo Items Grid */}
       <div className="turbo-grid">
         {filteredItems.map((item) => (
           <div key={item.id || 'unknown'} className="turbo-card">
             <div className="turbo-id">#{item.id || 'Unknown'}</div>
-            <div className="turbo-model">{item.model || 'Unknown Model'}</div>
+            <div className="turbo-model">{item.displayText || item.model || 'Unknown Model'}</div>
             <div className="turbo-location">
               <span className="location-icon">📍</span>
               {item.location || item.bay || 'No location'}
@@ -2053,7 +2103,7 @@ function App() {
                     onClick={handleBulkOrderConfirm}
                   >
                     Create Bulk Order ({selectedItems.size} items)
-                  </button>
+                </button>
                 )}
               </div>
             </div>
