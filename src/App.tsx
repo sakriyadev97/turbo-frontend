@@ -814,7 +814,7 @@ function App() {
 
 
   // Create a pending order
-  const createPendingOrder = async (orderData: { partNumber: string; model: string; location: string; quantity: number }) => {
+  const createPendingOrder = async (orderData: { partNumber: string; modelName: string; location: string; quantity: number }) => {
     const response = await fetch(`${API_BASE_URL}/create-order`, {
       method: 'POST',
       headers: {
@@ -840,11 +840,18 @@ function App() {
 
     // First, create all pending orders and collect them for bulk email
     for (const itemId of selectedItemsArray) {
-      const quantity = bulkOrderQuantities[itemId] || 0;
-      if (quantity <= 0) continue;
+      const quantity = bulkOrderQuantities[itemId] || 1; // Default to 1 if not set
+      if (quantity <= 0) {
+        console.log(`Skipping item ${itemId} with invalid quantity: ${quantity}`);
+        continue;
+      }
 
       const item = turboItems.find(t => t.id === itemId);
-      if (!item) continue;
+      if (!item) {
+        console.log(`Item not found for ID: ${itemId}`);
+        continue;
+      }
+      console.log('Processing item:', item);
 
       try {
         // Handle regular single items (simplified logic)
@@ -853,18 +860,33 @@ function App() {
                                item.smallPartNumbers?.[0] || 
                                item.id.split(',')[0].trim();
 
+        // Extract clean model name from display text
+        let cleanModel = firstPartNumber; // Default to part number
+        if (item.model && !item.model.includes('Big:') && !item.model.includes('Small:')) {
+          // If it's a regular model (not Big/Small variant), use the first part number
+          cleanModel = item.allPartNumbers?.[0] || item.id.split(',')[0].trim();
+        }
+
+        // Debug logging
+        console.log('Creating pending order with data:', {
+          partNumber: firstPartNumber,
+          modelName: cleanModel,
+          location: item.location || item.bay || '',
+          quantity: quantity
+        });
+
         await createPendingOrder({
           partNumber: firstPartNumber,
-          model: item.model,
-          location: item.location || item.bay || '',
+          modelName: cleanModel,
+          location: item.location || item.bay || 'Unknown Location',
           quantity: quantity
         });
 
         // Add to bulk email collection
         allOrdersForEmail.push({
           partNumber: firstPartNumber,
-          model: item.model,
-          location: item.location || item.bay || '',
+          modelName: cleanModel,
+          location: item.location || item.bay || 'Unknown Location',
           quantity: quantity
         });
 
@@ -892,9 +914,6 @@ function App() {
       toast.error(`Failed to create ${failCount} orders`);
     }
 
-    // Clean up temporary bulk items
-    setTurboItems(prev => prev.filter(item => !item.id.startsWith('BULK_')));
-    
     // Clear selections
     setSelectedItems(new Set());
     setBulkOrderQuantities({});
