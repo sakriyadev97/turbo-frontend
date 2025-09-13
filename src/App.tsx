@@ -544,16 +544,45 @@ function App() {
   // Get low stock items for order modal
   const lowStockItems = Array.isArray(turboItems) ? turboItems.filter(item => item.isLowStock) : [];
 
-  // Search functionality - only searches by turbo model name
+  // Search functionality - searches by individual part numbers and filters display
   const filteredItems = Array.isArray(turboItems) ? turboItems.filter(item => {
     if (!searchTerm.trim()) return true;
     
     const searchLower = searchTerm.toLowerCase().trim();
+    
+    // Search in individual part numbers for more precise matching
+    if (item.allPartNumbers && Array.isArray(item.allPartNumbers)) {
+      return item.allPartNumbers.some(partNumber => 
+        partNumber.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Fallback to model and displayText for backward compatibility
     const modelName = (item.model || '').toLowerCase();
     const displayText = (item.displayText || '').toLowerCase();
     
-    // Search only in model name and display text (which represents the turbo model)
     return modelName.includes(searchLower) || displayText.includes(searchLower);
+  }).map(item => {
+    // If there's a search term and the item has multiple part numbers, filter to show only matching ones
+    if (searchTerm.trim() && item.allPartNumbers && Array.isArray(item.allPartNumbers)) {
+      const searchLower = searchTerm.toLowerCase().trim();
+      const matchingPartNumbers = item.allPartNumbers.filter(partNumber => 
+        partNumber.toLowerCase().includes(searchLower)
+      );
+      
+      if (matchingPartNumbers.length > 0) {
+        // Create a filtered version of the item showing only matching part numbers
+        return {
+          ...item,
+          id: matchingPartNumbers.join(', '),
+          model: matchingPartNumbers.join(', '),
+          displayText: matchingPartNumbers.join(', '),
+          allPartNumbers: matchingPartNumbers
+        };
+      }
+    }
+    
+    return item;
   }) : [];
 
 
@@ -1500,15 +1529,15 @@ function App() {
       {/* Search Results Info */}
       {searchTerm && (
         <div style={{ margin: '20px 0', padding: '10px', background: '#f0f0f0', borderRadius: '8px', textAlign: 'center' }}>
-          <strong>Search Results:</strong> Found {filteredItems.length} items matching "{searchTerm}"
+          <strong>Search Results:</strong> Found {filteredItems.length} items matching "{searchTerm}" (Total items: {turboItems.length})
         </div>
       )}
 
       {/* Turbo Items Grid */}
       <div className="turbo-grid">
-        {filteredItems.map((item) => (
-          <div key={item.id || 'unknown'} className="turbo-card">
-            <div className="turbo-id">#{item.id || 'Unknown'}</div>
+        {filteredItems.map((item, index) => (
+          <div key={`${item.id}-${index}-${searchTerm}`} className="turbo-card" style={{ border: searchTerm ? '3px solid red' : 'none' }}>
+            <div className="turbo-id">#{item.id || 'Unknown'} {searchTerm ? '🔍' : ''}</div>
             <div className="turbo-model">{item.displayText || item.model || 'Unknown Model'}</div>
             <div className="turbo-location">
               <span className="location-icon">📍</span>
