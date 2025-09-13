@@ -544,7 +544,7 @@ function App() {
   // Get low stock items for order modal
   const lowStockItems = Array.isArray(turboItems) ? turboItems.filter(item => item.isLowStock) : [];
 
-  // Enhanced search functionality - starts with matching
+  // Enhanced search functionality - focuses on turbo model/part number matching
   const filteredItems = Array.isArray(turboItems) ? turboItems.filter(item => {
     if (!searchTerm.trim()) return true;
     
@@ -557,7 +557,8 @@ function App() {
     // Check if search term is numeric (for part number matching)
     const isNumericSearch = /^\d+$/.test(searchTerm);
     
-    // Search in part number fields first (most important for turbo search)
+    // For turbo search, we primarily focus on part numbers and model numbers
+    // Search in part number fields (most important for turbo search)
     const partNumberFields = [
       ...(item.allPartNumbers || []),
       ...(item.bigPartNumbers || []),
@@ -593,39 +594,41 @@ function App() {
       return true;
     }
     
-    // If no part number match and search is not purely numeric, check other fields
-    if (!isNumericSearch) {
-      const otherFields = [
-        item.model || '',
-        item.displayText || '',
-        item.location || item.bay || ''
-      ];
-      
-      const otherMatch = otherFields.some(field => {
-        if (!field) return false;
-        const fieldLower = field.toLowerCase();
-        
-        // Exact match
-        if (fieldLower === searchLower) {
-          console.log('Exact other field match found:', field);
-          return true;
-        }
-        
-        // Starts with match
-        if (fieldLower.startsWith(searchLower)) {
-          console.log('Starts with other field match found:', field);
-          return true;
-        }
-        
-        return false;
-      });
-      
-      console.log('Other field match found for item:', otherMatch);
-      return otherMatch;
+    // For numeric searches, ONLY search in part numbers - don't fall back to other fields
+    // This ensures we only show items that actually match the turbo model/part number
+    if (isNumericSearch) {
+      console.log('No part number match found for numeric search');
+      return false;
     }
     
-    console.log('No match found for item');
-    return false;
+    // For non-numeric searches, check other relevant fields (model, displayText)
+    // but exclude location/bay to avoid false matches
+    const otherFields = [
+      item.model || '',
+      item.displayText || ''
+    ];
+    
+    const otherMatch = otherFields.some(field => {
+      if (!field) return false;
+      const fieldLower = field.toLowerCase();
+      
+      // Exact match
+      if (fieldLower === searchLower) {
+        console.log('Exact other field match found:', field);
+        return true;
+      }
+      
+      // Starts with match
+      if (fieldLower.startsWith(searchLower)) {
+        console.log('Starts with other field match found:', field);
+        return true;
+      }
+      
+      return false;
+    });
+    
+    console.log('Other field match found for item:', otherMatch);
+    return otherMatch;
   }) : [];
 
   const totalItems = turboStats.totalItems;
