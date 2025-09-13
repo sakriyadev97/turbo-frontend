@@ -554,57 +554,78 @@ function App() {
     console.log('Searching for:', searchLower);
     console.log('Item being searched:', item);
     
-    // Search in multiple fields with "starts with" matching
-    const searchableFields = [
-      // Part numbers (ID) - search for starts with matches
+    // Check if search term is numeric (for part number matching)
+    const isNumericSearch = /^\d+$/.test(searchTerm);
+    
+    // Search in part number fields first (most important for turbo search)
+    const partNumberFields = [
       ...(item.allPartNumbers || []),
       ...(item.bigPartNumbers || []),
       ...(item.smallPartNumbers || []),
       item.id || '',
-      // Model name
-      item.model || '',
-      // Display text
-      item.displayText || '',
-      // Location/Bay - search for starts with matches
-      item.location || item.bay || '',
       // Individual part numbers from comma-separated strings
       ...(item.id ? item.id.split(',').map(p => p.trim()) : []),
       ...(item.model ? item.model.split(',').map(p => p.trim()) : [])
     ];
     
-    console.log('Searchable fields for this item:', searchableFields);
-    
-    // Check if any field starts with the search term
-    const matchFound = searchableFields.some(field => {
+    // Check part number fields first
+    const partNumberMatch = partNumberFields.some(field => {
       if (!field) return false;
       const fieldLower = field.toLowerCase();
       
       // Exact match
       if (fieldLower === searchLower) {
-        console.log('Exact match found:', field);
+        console.log('Exact part number match found:', field);
         return true;
       }
       
-      // Starts with match (e.g., "721" matches "721078", "721505", etc.)
-      if (fieldLower.startsWith(searchLower)) {
-        console.log('Starts with match found:', field);
+      // Starts with match for numeric searches
+      if (isNumericSearch && fieldLower.startsWith(searchLower)) {
+        console.log('Starts with part number match found:', field);
         return true;
-      }
-      
-      // For location fields, also check if bay number starts with search
-      if (fieldLower.includes('bay') && /^\d+$/.test(searchLower)) {
-        const bayMatch = fieldLower.match(/bay\s*(\d+)/i);
-        if (bayMatch && bayMatch[1].startsWith(searchLower)) {
-          console.log('Bay number match found:', field);
-          return true;
-        }
       }
       
       return false;
     });
     
-    console.log('Match found for item:', matchFound);
-    return matchFound;
+    if (partNumberMatch) {
+      console.log('Part number match found for item');
+      return true;
+    }
+    
+    // If no part number match and search is not purely numeric, check other fields
+    if (!isNumericSearch) {
+      const otherFields = [
+        item.model || '',
+        item.displayText || '',
+        item.location || item.bay || ''
+      ];
+      
+      const otherMatch = otherFields.some(field => {
+        if (!field) return false;
+        const fieldLower = field.toLowerCase();
+        
+        // Exact match
+        if (fieldLower === searchLower) {
+          console.log('Exact other field match found:', field);
+          return true;
+        }
+        
+        // Starts with match
+        if (fieldLower.startsWith(searchLower)) {
+          console.log('Starts with other field match found:', field);
+          return true;
+        }
+        
+        return false;
+      });
+      
+      console.log('Other field match found for item:', otherMatch);
+      return otherMatch;
+    }
+    
+    console.log('No match found for item');
+    return false;
   }) : [];
 
   const totalItems = turboStats.totalItems;
