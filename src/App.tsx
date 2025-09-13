@@ -544,102 +544,23 @@ function App() {
   // Get low stock items for order modal
   const lowStockItems = Array.isArray(turboItems) ? turboItems.filter(item => item.isLowStock) : [];
 
-  // Enhanced search functionality - focuses on turbo model/part number matching
+  // Search functionality - only searches by turbo model name
   const filteredItems = Array.isArray(turboItems) ? turboItems.filter(item => {
     if (!searchTerm.trim()) return true;
     
     const searchLower = searchTerm.toLowerCase().trim();
+    const modelName = (item.model || '').toLowerCase();
+    const displayText = (item.displayText || '').toLowerCase();
     
-    // Debug logging
-    console.log('Searching for:', searchLower);
-    console.log('Item being searched:', item);
-    
-    // Check if search term is numeric (for part number matching)
-    const isNumericSearch = /^\d+$/.test(searchTerm);
-    
-    // For turbo search, we primarily focus on part numbers and model numbers
-    // Search in part number fields (most important for turbo search)
-    const partNumberFields = [
-      ...(item.allPartNumbers || []),
-      ...(item.bigPartNumbers || []),
-      ...(item.smallPartNumbers || []),
-      item.id || '',
-      // Individual part numbers from comma-separated strings
-      ...(item.id ? item.id.split(',').map(p => p.trim()) : []),
-      ...(item.model ? item.model.split(',').map(p => p.trim()) : [])
-    ];
-    
-    // Check part number fields first
-    const partNumberMatch = partNumberFields.some(field => {
-      if (!field) return false;
-      const fieldLower = field.toLowerCase();
-      
-      // Exact match
-      if (fieldLower === searchLower) {
-        console.log('Exact part number match found:', field);
-        return true;
-      }
-      
-      // Starts with match for numeric searches
-      if (isNumericSearch && fieldLower.startsWith(searchLower)) {
-        console.log('Starts with part number match found:', field);
-        return true;
-      }
-      
-      return false;
-    });
-    
-    if (partNumberMatch) {
-      console.log('Part number match found for item');
-      return true;
-    }
-    
-    // For numeric searches, ONLY search in part numbers - don't fall back to other fields
-    // This ensures we only show items that actually match the turbo model/part number
-    if (isNumericSearch) {
-      console.log('No part number match found for numeric search');
-      return false;
-    }
-    
-    // For non-numeric searches, check other relevant fields (model, displayText)
-    // but exclude location/bay to avoid false matches
-    const otherFields = [
-      item.model || '',
-      item.displayText || ''
-    ];
-    
-    const otherMatch = otherFields.some(field => {
-      if (!field) return false;
-      const fieldLower = field.toLowerCase();
-      
-      // Exact match
-      if (fieldLower === searchLower) {
-        console.log('Exact other field match found:', field);
-        return true;
-      }
-      
-      // Starts with match
-      if (fieldLower.startsWith(searchLower)) {
-        console.log('Starts with other field match found:', field);
-        return true;
-      }
-      
-      return false;
-    });
-    
-    console.log('Other field match found for item:', otherMatch);
-    return otherMatch;
+    // Search only in model name and display text (which represents the turbo model)
+    return modelName.includes(searchLower) || displayText.includes(searchLower);
   }) : [];
+
 
   const totalItems = turboStats.totalItems;
   const lowStockItemsCount = turboStats.lowStockItems;
   const totalQuantity = turboStats.totalQuantity;
   
-  // Debug search results
-  console.log('Search term:', searchTerm);
-  console.log('Total items:', turboItems?.length || 0);
-  console.log('Filtered items:', filteredItems.length);
-  console.log('Filtered items:', filteredItems);
 
   const handleLoginInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -1520,19 +1441,10 @@ function App() {
         <div className="search-container">
           <input
             type="text"
-            placeholder="Search by part number (starts with), model, or bay number..."
+            placeholder="Search by turbo model name..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-              }
-            }}
-            onFocus={(e) => {
-            }}
-            onBlur={(e) => {
             }}
             className="search-input"
           />

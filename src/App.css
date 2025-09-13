@@ -113,6 +113,7 @@ body {
   transform: translateY(-50%);
   color: #6b7280;
   font-size: 18px;
+  pointer-events: none;
 }
 
 .action-buttons {
