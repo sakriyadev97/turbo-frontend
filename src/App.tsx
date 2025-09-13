@@ -591,12 +591,6 @@ function App() {
         return true;
       }
       
-      // Contains match (for better search experience)
-      if (fieldLower.includes(searchLower)) {
-        console.log('Contains match found:', field);
-        return true;
-      }
-      
       // For location fields, also check if bay number starts with search
       if (fieldLower.includes('bay') && /^\d+$/.test(searchLower)) {
         const bayMatch = fieldLower.match(/bay\s*(\d+)/i);
